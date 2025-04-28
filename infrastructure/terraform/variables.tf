@@ -39,7 +39,7 @@ variable "kms_deletion_window" {
 variable "kms_key_administrators" {
   description = "List of ARNs of IAM users/roles that can administer the KMS key"
   type        = list(string)
-  default     = ["arn:aws:iam::000000000000:assumed-role/Admin"]  # Empty list as default
+  default     = ["arn:aws:iam::123456789012:assumed-role/Admin"]  # Empty list as default
 }
 
 ########################################################
