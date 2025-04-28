@@ -1,5 +1,5 @@
 # Agentic Platform
-A modular repository demonstrating how to build an agentic platform including labs and a deployable sample "agentic platform" to demonstrate how to operatinalize agents from multiple open source frameworks as well as Bedrock agents.
+A modular repository demonstrating how to build an agentic platform including labs and a deployable sample "agentic platform" to demonstrate how to operationalize agents from multiple open source frameworks as well as Bedrock agents.
 
 ## Project status
 This sample is active as of 4/22/2025.
@@ -8,11 +8,11 @@ This sample is active as of 4/22/2025.
 ## High Level Architecture
 ![High Level Architecture](media/highlevel-architecture.png)
 
-The sample platform is built on EKS uses a variety of AWS services to deploy 10+ agentic systems demonstrating how everything works together. It's instrumented with telemetry and demonstrates operational considerations when deploying agents. Code is written in an abstracted/modular way to make it easy to switch the underlying infrastructure components to suite your needs.
+The sample platform is built on EKS and uses a variety of AWS services to deploy 10+ agentic systems demonstrating how everything works together. It's instrumented with telemetry and demonstrates operational considerations when deploying agents. Code is written in an abstracted/modular way to make it easy to switch the underlying infrastructure components to suit your needs.
 
 ## Agent Process Architecture
-![Agent Process ARchitecture](media/agent-design.png)
-Each agent runs as a FastAPI server sharing a core package which contains types and client abstrations (like LLM API provider). APIs are authenticated using Cognito through a middleware layer that's simple to swap out for your own IDP. 
+![Agent Process Architecture](media/agent-design.png)
+Each agent runs as a FastAPI server sharing a core package which contains types and client abstractions (like LLM API provider). APIs are authenticated using Cognito through a middleware layer that's simple to swap out for your own IDP. 
 
 The agents themselves do not have IAM roles attached to them. Instead they connect to AWS resources through microservices like the LLM Gateway, Memory Gateway, and Retrieval Gateway (which do have IAM roles through IRSA). Those requests are authenticated by passing JWT tokens between each request. Each pod running in EKS is authenticated using oAuth regardless of whether the request was service <> service or user <> service by validating tokens against the IDP's public cert.
 
