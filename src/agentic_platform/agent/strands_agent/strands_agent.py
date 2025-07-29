@@ -8,7 +8,7 @@ from agentic_platform.core.client.llm_gateway.llm_gateway_client import LLMGatew
 from agentic_platform.core.models.llm_models import LiteLLMClientInfo
 
 from strands import Agent as StrandsAgent
-from strands.models.litellm import LiteLLMModel as StrandsLiteLLMModel
+from strands.models.litellm import OpenAIModel
 
 from agentic_platform.core.models.memory_models import (
     UpsertSessionContextRequest, 
@@ -40,24 +40,18 @@ class StrandsAgentWrapper:
         temp: float = base_prompt.hyperparams.get("temperature", 0.5)
         max_tokens: int = base_prompt.hyperparams.get("max_tokens", 1000)
         
-        # Create LiteLLM model for Strands
-        # Route through our LiteLLM gateway by using the gateway endpoint
-        model_params = {
-            "max_tokens": max_tokens,
-            "temperature": temp,
-        }
-        
-        # Add gateway routing if available
-        try:
-            model_params["api_base"] = litellm_info.api_endpoint
-            model_params["api_key"] = litellm_info.api_key
-        except Exception:
-            # Fall back to direct model access if gateway not available
-            pass
-            
-        self.model = StrandsLiteLLMModel(
-            model_id=f"bedrock/{base_prompt.model_id}",
-            params=model_params
+        # To use the LiteLLM proxy, you need to use the OpenAIModel. The default
+        # litellm object uses the LiteLLM SDK which has name conflicts when trying
+        # to use the proxy so it's preferred to use the OpenAIModel type when calling
+        # the actual proxy vs. just using the SDK.
+        self.model = OpenAIModel(
+            model_id=base_prompt.model_id,  # Use the model name directly, not bedrock/ prefix
+            client_args={
+                "api_key": litellm_info.api_key,
+                "base_url": litellm_info.api_endpoint
+            },
+            max_tokens=max_tokens,
+            temperature=temp
         )
         
         # Create the Strands agent

@@ -79,7 +79,7 @@ def test_imports_structure():
         # Check for key imports
         required_imports = [
             "from strands import Agent as StrandsAgent",
-            "from strands.models.litellm import LiteLLMModel",
+            "from strands.models.litellm import OpenAIModel",
             "from agentic_platform.core.models.api_models import AgenticRequest, AgenticResponse",
             "from agentic_platform.core.client.memory_gateway.memory_gateway_client import MemoryGatewayClient"
         ]
