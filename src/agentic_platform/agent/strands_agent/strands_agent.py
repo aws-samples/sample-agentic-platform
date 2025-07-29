@@ -33,26 +33,32 @@ class StrandsAgentWrapper:
                 model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0"
             )
         
-        # Get LiteLLM client info for routing through our gateway
-        litellm_info: LiteLLMClientInfo = LLMGatewayClient.get_client_info()
-        
         # Extract hyperparameters
         temp: float = base_prompt.hyperparams.get("temperature", 0.5)
         max_tokens: int = base_prompt.hyperparams.get("max_tokens", 1000)
         
-        # To use the LiteLLM proxy, you need to use the OpenAIModel. The default
-        # litellm object uses the LiteLLM SDK which has name conflicts when trying
-        # to use the proxy so it's preferred to use the OpenAIModel type when calling
-        # the actual proxy vs. just using the SDK.
-        self.model = OpenAIModel(
-            model_id=base_prompt.model_id,  # Use the model name directly, not bedrock/ prefix
-            client_args={
-                "api_key": litellm_info.api_key,
-                "base_url": litellm_info.api_endpoint
-            },
-            max_tokens=max_tokens,
-            temperature=temp
-        )
+        # Use OpenAIModel to avoid LiteLLM SDK conflicts with proxy
+        # This works with both direct SDK and proxy configurations
+        model_kwargs = {
+            "model_id": base_prompt.model_id,  # Use model name directly, not bedrock/ prefix
+            "max_tokens": max_tokens,
+            "temperature": temp
+        }
+        
+        # Try to get proxy configuration, fall back to SDK if not available
+        try:
+            litellm_info: LiteLLMClientInfo = LLMGatewayClient.get_client_info()
+            if litellm_info.api_endpoint and litellm_info.api_key:
+                # Use proxy configuration
+                model_kwargs["client_args"] = {
+                    "api_key": litellm_info.api_key,
+                    "base_url": litellm_info.api_endpoint
+                }
+        except Exception:
+            # Fall back to direct SDK (no client_args needed)
+            pass
+            
+        self.model = OpenAIModel(**model_kwargs)
         
         # Create the Strands agent
         self.agent = StrandsAgent(
