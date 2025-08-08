@@ -1,0 +1,7 @@
+# PostgreSQL Users Setup Configuration
+
+# Platform configuration parameter name
+platform_config_parameter_name = "/agentic-platform/config/dev"
+
+# Connection method
+use_local_proxy = false  # Set to true if port forwarding through the bastion

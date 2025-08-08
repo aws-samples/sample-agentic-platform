@@ -8,20 +8,13 @@ This guide covers deploying the sample agentic platform to AWS. The platform use
 
 ## Prerequisites
 
-### 1. Required Tools
+### Required Tools
 - [Terraform using tfenv](https://github.com/tfutils/tfenv)
 - [AWS CLI & configuration](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - [SSM Plugin for AWS CLI](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) (for port forwarding)
 - [uv](https://github.com/astral-sh/uv) for Python development
 - [Docker](https://docs.docker.com/engine/install/)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
-
-### 2. OpenSearch Service-Linked Role
-Create the required service-linked role for OpenSearch:
-```bash
-aws iam create-service-linked-role --aws-service-name opensearchservice.amazonaws.com
-```
-(If it already exists, that's fine - we just need it present)
 
 ## Installation
 
@@ -35,64 +28,51 @@ cd sample-agentic-platform
 
 ### Option 1: Automated Bootstrap (Recommended)
 
-The easiest way to deploy is using our CloudFormation bootstrap templates that handle infrastructure, CI/CD, and cluster setup automatically.
+Use the automated bootstrap for production deployments. This approach deploys infrastructure from within the VPC for security and keeps the EKS cluster private.
 
-Follow the step-by-step instructions in [bootstrap/README.md](bootstrap/README.md):
+**Note:** This option is currently Work In Progress (WIP).
 
-1. **Infrastructure Bootstrap**: Deploy Terraform infrastructure using CloudFormation
-2. **GitHub Bootstrap**: Set up CI/CD pipeline (optional)  
-3. **EKS Bootstrap**: Configure cluster essentials
-4. **Application Deployment**: Deploy agents and gateways
+```bash
+# Follow the bootstrap deployment guide
+cd bootstrap/
+# See bootstrap/README.md for detailed instructions
+```
 
-### Option 2: Manual Deployment
+### Option 2: Manual Deployment (Testing/Local Development)
 
-If you prefer to deploy manually or customize the deployment:
+For testing and development purposes, you can deploy the Terraform scripts directly.
 
 #### 1. Infrastructure Deployment
 
-Create a `terraform.tfvars` file in the `infrastructure/terraform` directory:
+Follow the detailed instructions in the [infrastructure README](infrastructure/README.md) for complete deployment steps including:
+- Foundation stack (VPC setup)
+- Platform-EKS stack (main infrastructure)
+- PostgreSQL users setup
+
+#### 2. Deploy LiteLLM
+
+After completing the infrastructure setup, deploy LiteLLM:
 
 ```bash
-aws_region  = "us-west-2"
-environment = "dev"
-stack_name  = "agent-ptfm"
-federated_role_name = "<YOUR_ROLE_FOR_EKS_CONSOLE_ACCESS>"
-enable_kms_encryption = false
-kms_deletion_window   = 7
+./deploy/deploy-litellm.sh
 ```
 
-Deploy with Terraform:
+#### 3. Deploy Applications
+
+To deploy an agent application:
+
 ```bash
-cd infrastructure/terraform
-terraform init
-terraform plan
-terraform apply
-```
+# Deploy a specific application (replace <dockerfile-name> with actual name)
+./deploy/deploy-application.sh <dockerfile-name> --build
 
-#### 2. Cluster Configuration
-
-Set up cluster essentials:
-```bash
-./bootstrap/eks-bootstrap.sh
-```
-
-#### 3. Application Deployment
-
-Deploy core services and agents using the provided scripts:
-```bash
-# Deploy core services (gateways)
-./deploy/deploy-gateways.sh --build
-
-# Deploy all agent applications  
-./deploy/deploy-all-agents.sh --build
-
-# Or deploy individual services
-./deploy/deploy-application.sh llm-gateway --build
+# Examples:
+./deploy/deploy-application.sh agentic-chat --build
+./deploy/deploy-application.sh langgraph-chat --build
 ```
 
 ## Accessing the Private EKS Cluster
 
-Since the EKS cluster is private, you need to access it through the bastion host using SSM port forwarding. **Note:** You'll need the AWS SSM plugin installed for port forwarding to work.
+Since the EKS cluster is private (when deployed via bootstrap), you need to access it through the bastion host using SSM port forwarding. **Note:** You'll need the AWS SSM plugin installed for port forwarding to work.
 
 1. **Find your bastion instance ID:**
 ```bash
@@ -157,16 +137,9 @@ This script automatically:
 
 ## Public Access with CloudFront
 
-By default, the load balancer ingress rules are configured to be private. If you'd like to expose endpoints publicly and enable HTTPS, you can create a CloudFront distribution and configure it to use the load balancer as a VPC origin once the cluster bootstrap script is run and the load balancer controller is up.
+By default, the load balancer ingress rules are configured to be private. If you'd like to expose endpoints publicly and enable HTTPS, you can configure the cloudfront distruvtion to use the load balancer as a VPC origin once you've deployed a resource with ingress (which will automatically create an ALB)
 
-AWS recently introduced [CloudFront VPC Origins](https://aws.amazon.com/blogs/networking-and-content-delivery/introducing-cloudfront-virtual-private-cloud-vpc-origins-shield-your-web-applications-from-public-internet/), which allows you to securely deliver content from applications hosted in private subnets without exposing them to the public internet. This approach provides several benefits:
-
-- **Enhanced Security**: Applications remain in private subnets with CloudFront as the sole ingress point
-- **Reduced Attack Surface**: Prevents users from bypassing CloudFront to access applications directly  
-- **High Performance**: Traffic stays on the AWS backbone network for optimized performance
-- **Built-in Security**: Integrates with AWS WAF and AWS Shield Advanced for additional protection
-
-To set this up, create a CloudFront distribution in the AWS console and configure your Application Load Balancer as a VPC origin after deployment is complete.
+AWS recently introduced [CloudFront VPC Origins](https://aws.amazon.com/blogs/networking-and-content-delivery/introducing-cloudfront-virtual-private-cloud-vpc-origins-shield-your-web-applications-from-public-internet/), which allows you to securely deliver content from applications hosted in private subnets without exposing them to the public internet. This approach allows you to enable https using CloudFront's cert if you don't have one available.
 
 ## Testing the Deployment
 
@@ -201,10 +174,10 @@ For local development, use the provided Docker Compose setup:
 
 ```bash
 # Start local dependencies
-docker compose up -d
+docker compose up
 
 # Run specific services
-make langgraph-chat
+make agentic-chat
 ```
 
 ## Observability

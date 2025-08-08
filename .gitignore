@@ -197,3 +197,6 @@ build/terraform-outputs.json
 
 # Ignore AWS overlay values
 aws-overlay-values.yaml
+
+# Ignore Cline memory bank
+memory-bank/

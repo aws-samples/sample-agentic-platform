@@ -19,7 +19,7 @@ resource "aws_eks_cluster" "main" {
     subnet_ids              = var.private_subnet_ids
     security_group_ids      = [aws_security_group.eks_cluster_sg.id]
     endpoint_private_access = true
-    endpoint_public_access  = false
+    endpoint_public_access  = var.enable_eks_public_access
   }
 
   # Enable EKS cluster encryption with KMS only if enable_kms_encryption is true

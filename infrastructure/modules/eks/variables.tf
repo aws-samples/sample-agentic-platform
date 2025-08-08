@@ -35,6 +35,12 @@ variable "kms_key_arn" {
   default     = null
 }
 
+variable "enable_eks_public_access" {
+  description = "Enable public access to the EKS cluster"
+  type        = bool
+  default     = false
+}
+
 variable "additional_admin_role_arns" {
   description = "List of additional IAM role ARNs to grant cluster admin access"
   type        = list(string)

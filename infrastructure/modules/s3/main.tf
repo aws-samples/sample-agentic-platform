@@ -8,11 +8,11 @@ resource "aws_s3_bucket" "this" {
   # checkov:skip=CKV_AWS_21:S3 versioning disabled - website content is versioned through CI/CD and stored in Git
   # checkov:skip=CKV2_AWS_62:Event notifications not required for static website hosting - no automated processing needed
   # checkov:skip=CKV_AWS_18:Access logging not needed for sample UI.
-  bucket        = var.bucket_name
+  # bucket name omitted - Terraform will generate a unique name automatically
   force_destroy = var.force_destroy
 
   tags = merge(var.common_tags, {
-    Name = var.bucket_name
+    Name = "S3 Bucket"
     Type = var.bucket_type
   })
 }

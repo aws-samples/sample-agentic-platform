@@ -95,11 +95,6 @@ output "name_prefix" {
   value       = local.name_prefix
 }
 
-output "suffix" {
-  description = "Random suffix used by resources"
-  value       = local.suffix
-}
-
 output "common_tags" {
   description = "Common tags applied to all resources"
   value       = local.common_tags
