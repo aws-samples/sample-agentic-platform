@@ -46,7 +46,7 @@ locals {
 
 # KMS Module
 module "kms" {
-  source = "../modules/kms"
+  source = "../../modules/kms"
 
   enable_kms_encryption   = var.enable_kms_encryption
   kms_deletion_window     = var.kms_deletion_window
@@ -57,7 +57,7 @@ module "kms" {
 
 # Networking Module
 module "networking" {
-  source = "../modules/networking"
+  source = "../../modules/networking"
 
   name_prefix           = local.name_prefix
   suffix               = local.suffix

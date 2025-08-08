@@ -1,0 +1,87 @@
+# Default values for strands-glue-athena.
+# This is a YAML-formatted file.
+
+# Specify the namespace where this service will be deployed
+# Leave empty to use the namespace specified in the helm command
+namespace: "default"
+
+# Replica count for scaling
+replicaCount: 1
+
+# These values will be pulled from an overlay file. 
+aws:
+  region: ""
+  account: ""
+
+image:
+  repository: "agentic-platform-strands-glue-athena"
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: "strands-glue-athena"
+fullnameOverride: "strands-glue-athena"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+env:
+  - name: PYTHONPATH
+    value: /app
+
+# Resource allocation
+resources:
+  requests:
+    cpu: 100m      # 0.1 CPU core (10% of a core)
+    memory: 256Mi  # 256 megabytes
+  limits:
+    memory: 512Mi  # 512 megabytes
+
+# Ingress configuration
+ingress:
+  enabled: true
+  path: "/strands-glue-athena"
+
+# Service account for permissions
+serviceAccount:
+  name: "strands-glue-athena-agent-sa"
+  create: true
+  irsaConfigKey: "AGENT_ROLE_ARN"
+
+# IRSA role configuration
+irsaConfigKey: "AGENT_ROLE_ARN"
+
+# Agent secret configuration
+agentSecret:
+  configKey: "AGENT_LITELLM_SECRET_ARN"
+
+# Default values if keys aren't found in central config
+configDefaults:
+  LITELLM_API_ENDPOINT: "http://litellm.default.svc.cluster.local:80"
+  RETRIEVAL_GATEWAY_ENDPOINT: "http://retrieval-gateway.default.svc.cluster.local:80"
+  MEMORY_GATEWAY_ENDPOINT: "http://memory-gateway.default.svc.cluster.local:80"
+
+# AWS IAM permissions required for this agent
+iamPolicy:
+  Version: "2012-10-17"
+  Statement:
+    - Effect: "Allow"
+      Action:
+        - "glue:GetDatabases"
+        - "glue:GetTables"
+        - "glue:GetTable"
+        - "glue:SearchTables"
+        - "athena:StartQueryExecution"
+        - "athena:GetQueryExecution"
+        - "athena:GetQueryResults"
+        - "athena:ListQueryExecutions"
+      Resource: "*"
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+        - "s3:PutObject"
+        - "s3:ListBucket"
+      Resource:
+        - "arn:aws:s3:::athena-query-results-*"
+        - "arn:aws:s3:::athena-query-results-*/*"

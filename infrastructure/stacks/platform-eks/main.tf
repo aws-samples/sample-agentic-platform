@@ -17,6 +17,18 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">= 2.0"
+    }
   }
 }
 
@@ -25,14 +37,45 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Configure Kubernetes provider using EKS module outputs
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.main.token
+}
+
+# Get EKS cluster auth token
+data "aws_eks_cluster_auth" "main" {
+  name = module.eks.cluster_name
+}
+
+provider "helm" {
+  kubernetes = {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.main.token
+  }
+}
+
 # Get current AWS account information
 data "aws_caller_identity" "current" {}
+
+# Generate random suffix for unique resource naming
+resource "random_string" "suffix" {
+  length  = 3
+  special = false
+  upper   = false
+}
 
 # Local values for consistent naming
 locals {
   name_prefix = var.name_prefix
-  suffix      = var.suffix
-  common_tags = var.common_tags
+  suffix      = random_string.suffix.result
+  common_tags = {
+    Environment = "dev"
+    ManagedBy   = "Terraform"
+    Project     = "Agentic Platform Sample"
+  }
 }
 
 ########################################################
@@ -54,6 +97,9 @@ module "eks" {
   # KMS encryption - passed in as variables
   enable_kms_encryption = var.enable_kms_encryption
   kms_key_arn          = var.kms_key_arn
+
+  # Enable public access to cluster. 
+  enable_eks_public_access = var.enable_eks_public_access
 
   # Node configuration
   node_instance_types = var.node_instance_types
@@ -183,6 +229,9 @@ module "irsa" {
   
   # Agent specific ARNs
   agent_secret_arns = [module.litellm.agent_secret_arn]
+
+  # Fix chicken and egg problem: EBS CSI addon needs nodes to be ready
+  depends_on = [module.eks]
 }
 
 ########################################################
@@ -253,7 +302,6 @@ module "s3_spa_website" {
   source = "../../modules/s3"
 
   # Core configuration
-  bucket_name = "${local.name_prefix}spa-website-${local.suffix}"
   bucket_type = "StaticWebsite"
   common_tags = local.common_tags
 
@@ -343,4 +391,34 @@ module "parameter_store" {
     #   KNOWLEDGE_BASE_ID = module.bedrock.default_kb_identifier
     # }
   }
+}
+
+########################################################
+# Conditional Kubernetes Module
+########################################################
+
+module "kubernetes" {
+  count = (var.enable_eks_public_access && !var.deploy_inside_vpc) || (!var.enable_eks_public_access && var.deploy_inside_vpc) ? 1 : 0
+  
+  source = "../../modules/kubernetes"
+
+  # ConfigMap configuration - use the parsed JSON from parameter store
+  namespace          = "default"
+  configuration_data = jsondecode(module.parameter_store.configuration_json)
+
+  # External Secrets Operator configuration
+  external_secrets_service_account_role_arn = module.irsa.external_secrets_role_arn
+
+  # AWS Load Balancer Controller configuration
+  aws_load_balancer_controller_service_account_role_arn = module.irsa.load_balancer_controller_role_arn
+  cluster_name                                          = module.eks.cluster_name
+  aws_region                                            = var.aws_region
+  vpc_id                                                = var.vpc_id
+
+  # OTEL Collectors configuration
+  otel_chart_path         = "../../../k8s/helm/charts/otel"
+  otel_collector_role_arn = module.irsa.otel_collector_role_arn
+
+  # Ensure kubernetes module waits for EKS and IRSA to be ready
+  depends_on = [module.eks, module.irsa]
 }

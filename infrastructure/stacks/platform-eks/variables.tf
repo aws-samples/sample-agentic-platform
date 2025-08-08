@@ -24,17 +24,6 @@ variable "name_prefix" {
   default     = "agent-ptfm-"
 }
 
-variable "suffix" {
-  description = "Random suffix used by resources"
-  type        = string
-  default     = "dg3"
-}
-
-variable "common_tags" {
-  description = "Common tags applied to all resources"
-  type        = map(string)
-}
-
 ########################################################
 # Networking Variables (from base stack)
 ########################################################
@@ -72,11 +61,13 @@ variable "enable_kms_encryption" {
 variable "kms_key_arn" {
   description = "ARN of the KMS key"
   type        = string
+  default     = null
 }
 
 variable "kms_key_id" {
   description = "ID of the KMS key"
   type        = string
+  default     = null
 }
 
 ########################################################
@@ -115,6 +106,19 @@ variable "additional_admin_role_arns" {
   default     = []
 }
 
+variable "enable_eks_public_access" {
+  description = "Enable public access to EKS APIs. Defaults to false"
+  type        = bool
+  default     = false
+}
+
+variable "deploy_inside_vpc" {
+  description = "Deploy EKS cluster inside VPC. Defaults to false"
+  type        = bool
+  default     = false
+
+}
+
 ########################################################
 # PostgreSQL Aurora Configuration Variables
 ########################################################
@@ -134,7 +138,7 @@ variable "postgres_instance_class" {
 variable "postgres_deletion_protection" {
   description = "Enable deletion protection for PostgreSQL cluster"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "bastion_security_group_ids" {
