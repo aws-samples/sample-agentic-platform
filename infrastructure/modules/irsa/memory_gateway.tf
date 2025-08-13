@@ -64,3 +64,9 @@ resource "aws_iam_role_policy_attachment" "memory_gateway_cloudwatch_attachment"
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
   role       = aws_iam_role.memory_gateway_role.name
 }
+
+# Add Bedrock AgentCore Memory access
+resource "aws_iam_role_policy_attachment" "memory_gateway_bedrock_agentcore_attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/BedrockAgentCoreFullAccess"
+  role       = aws_iam_role.memory_gateway_role.name
+}
