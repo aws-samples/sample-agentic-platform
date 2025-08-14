@@ -54,18 +54,6 @@ The workshop consists of several notebooks that build foundational abstractions:
 - 🔍 Understanding framework tradeoffs
 - 🔄 Migrating agents between frameworks
 
-### 6. Data Processing & Analysis (`6.1_data_processing_analysis_using_code_interpreter.ipynb`)
-- 📊 Using AWS Bedrock AgentCore Code Interpreter for data analysis
-- 🔧 Setting up both boto3 and AgentCore SDK approaches
-- 📈 Performing statistical calculations on datasets
-- 🔄 Processing data with JavaScript and Python
-
-### 7. File Operations (`6.2_file_operations_using_code_interpreter.ipynb`)
-- 📁 Comprehensive file operations using Code Interpreter
-- 📄 Reading, writing, and processing files
-- 📊 Working with JSON and CSV files
-- 🔄 Complete file workflows including upload, process, and verify
-
 
 ## 🧭 Workshop Flow
 
