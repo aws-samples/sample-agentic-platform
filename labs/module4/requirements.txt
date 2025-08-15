@@ -37,3 +37,5 @@ opentelemetry-sdk>=1.20.0
 # AWS specific
 amazon-bedrock-runtime>=0.1.0
 langgraph>=0.1.0  # For MCP implementation
+bedrock-agentcore>=0.1.1
+nova-act>=v2.0.78.0

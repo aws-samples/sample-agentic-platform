@@ -10,6 +10,7 @@ This module explores advanced agent capabilities through Model Context Protocol 
 * Mix and match different agent frameworks (PydanticAI, LangChain, etc.)
 * Build collaborative multi-agent systems
 * Integrate third-party MCP servers into your applications
+* Interact with web applications using Amazon Bedrock AgentCore Brower Tool
 
 ## Prerequisites
 
