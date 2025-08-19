@@ -31,7 +31,7 @@ There are 5 progressive modules that increase in complexity, going from the basi
 1. **Module 1**: Prompt Engineering & Evaluation
 2. **Module 2**: Common Agentic Patterns  
 3. **Module 3**: Building Agentic Applications
-4. **Module 4**: Multi-Agent Systems & MCP
+4. **Module 4**: Advanced Agentic Concepts: Multi-Agent, MCP, AgentCore Tools
 5. **Module 5**: Deployment and Infrastructure
 
 Only module 5 requires the agent platform to be deployed. See [labs/README.md](labs/README.md) for detailed lab instructions.
