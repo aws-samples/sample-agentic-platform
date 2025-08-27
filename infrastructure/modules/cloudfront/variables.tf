@@ -28,3 +28,9 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "vpc_origin_arns" {
+  description = "List of VPC origin ARNs (e.g., ALB ARNs) to create VPC origins for"
+  type        = list(string)
+  default     = []
+}
