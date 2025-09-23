@@ -1,0 +1,84 @@
+# Platform AgentCore Stack Configuration
+#
+# Copy this file to terraform.tfvars and update the values for your environment.
+# These values should come from your foundation stack outputs.
+
+########################################################
+# Core Configuration
+########################################################
+
+aws_region   = "us-west-2"
+environment  = "dev"
+name_prefix  = "agentcore-"
+
+########################################################
+# Networking Configuration (from foundation stack)
+########################################################
+
+# VPC configuration - get these from your foundation stack outputs
+vpc_id         = "vpc-xxxxxxxxx"
+vpc_cidr_block = "10.0.0.0/16"
+
+# Subnet IDs - get these from your foundation stack outputs
+private_subnet_ids = [
+  "subnet-xxxxxxxxx",
+  "subnet-yyyyyyyyy"
+]
+
+public_subnet_ids = [
+  "subnet-zzzzzzzzz",
+  "subnet-aaaaaaaaa"
+]
+
+########################################################
+# KMS Configuration (from foundation stack)
+########################################################
+
+enable_kms_encryption = false
+# kms_key_arn = "arn:aws:kms:us-west-2:123456789012:key/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+# kms_key_id  = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+########################################################
+# PostgreSQL Configuration
+########################################################
+
+postgres_instance_count       = 1
+postgres_instance_class      = "db.serverless"
+postgres_deletion_protection = false
+postgres_iam_username        = "postgres_iam_user"
+
+########################################################
+# Redis Configuration
+########################################################
+
+redis_node_type                 = "cache.t3.micro"
+redis_engine_version           = "7.0"
+redis_num_cache_clusters       = 1
+redis_maintenance_window       = "sun:05:00-sun:06:00"
+redis_snapshot_window          = "03:00-04:00"
+redis_snapshot_retention_limit = 1
+
+########################################################
+# Cognito Configuration
+########################################################
+
+domain_name               = ""
+use_custom_domain        = false
+enable_federated_identity = false
+
+########################################################
+# ECS LiteLLM Configuration
+########################################################
+
+litellm_cpu                  = 1024  # 1 vCPU
+litellm_memory              = 2048  # 2 GB
+litellm_desired_count       = 1
+litellm_enable_auto_scaling = true
+litellm_min_capacity        = 1
+litellm_max_capacity        = 3
+
+########################################################
+# S3 Configuration
+########################################################
+
+s3_force_destroy = true  # Set to false for production

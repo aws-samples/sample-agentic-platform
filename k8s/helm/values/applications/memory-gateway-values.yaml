@@ -47,6 +47,9 @@ ingress:
 serviceAccount:
   name: "memory-gateway-sa"
   create: true
+  irsaConfigKey: MEMORY_GATEWAY_ROLE_ARN
 
-# Memory gateway role
-irsaConfigKey: MEMORY_GATEWAY_ROLE_ARN
+# Configuration defaults that will be added to the configmap
+# Provider: bedrock_agentcore or postgres
+configDefaults:
+  MEMORY_PROVIDER: "bedrock_agentcore"

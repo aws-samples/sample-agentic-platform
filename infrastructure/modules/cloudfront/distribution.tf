@@ -13,7 +13,7 @@ resource "aws_cloudfront_distribution" "spa_website" {
 
   # Logging disabled for security and cost optimization
 
-  # Single origin for all paths
+  # S3 origin for static website
   origin {
     domain_name              = var.s3_bucket_regional_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.spa_website.id
@@ -23,6 +23,19 @@ resource "aws_cloudfront_distribution" "spa_website" {
     origin_shield {
       enabled              = true
       origin_shield_region = "us-west-2"
+    }
+  }
+
+  # VPC origins for private load balancers
+  dynamic "origin" {
+    for_each = aws_cloudfront_vpc_origin.alb
+    content {
+      domain_name = "vpc-origin-${origin.key}.example.com"  # Placeholder domain
+      origin_id   = "VPC-0"
+      
+      vpc_origin_config {
+        vpc_origin_id = origin.value.id
+      }
     }
   }
 
@@ -51,6 +64,23 @@ resource "aws_cloudfront_distribution" "spa_website" {
     max_ttl                    = 86400
     compress                   = true
     response_headers_policy_id = aws_cloudfront_response_headers_policy.spa_website.id
+  }
+
+  # Cache behavior for API paths (/api/*)
+  dynamic "ordered_cache_behavior" {
+    for_each = length(var.vpc_origin_arns) > 0 ? [1] : []
+    content {
+      path_pattern     = "/api/*"
+      allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+      cached_methods   = ["GET", "HEAD"]
+      target_origin_id = "VPC-0"  # Use first VPC origin
+
+      cache_policy_id            = data.aws_cloudfront_cache_policy.managed_caching_disabled.id
+      response_headers_policy_id = data.aws_cloudfront_response_headers_policy.managed_cors_with_preflight.id
+
+      viewer_protocol_policy = "redirect-to-https"
+      compress              = false
+    }
   }
 
   price_class = "PriceClass_100"

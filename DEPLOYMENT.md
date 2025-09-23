@@ -57,7 +57,17 @@ After completing the infrastructure setup, deploy LiteLLM:
 ./deploy/deploy-litellm.sh
 ```
 
-#### 3. Deploy Applications
+#### 3. Deploy gateways
+
+If you want to use the memory or retrieval gateways, run:
+
+```bash
+./deploy/deploy-gateways.sh --build
+```
+
+You can configure the memory gateway provider by modifying the `MEMORY_PROVIDER` setting in the `configDefaults` section of `k8s/helm/values/applications/memory-gateway-values.yaml`.
+
+#### 4. Deploy Applications
 
 To deploy an agent application:
 

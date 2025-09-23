@@ -29,3 +29,9 @@ variable "parameter_base_path" {
   type        = string
   default     = "/agentic-platform/config"
 }
+
+variable "parameter_name" {
+  description = "Custom parameter name (overrides default path/environment naming)"
+  type        = string
+  default     = null
+}

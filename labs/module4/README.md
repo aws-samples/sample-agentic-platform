@@ -12,6 +12,7 @@ This module explores advanced agent capabilities through Model Context Protocol 
 * Integrate third-party MCP servers into your applications
 * Use AWS Bedrock AgentCore Code Interpreter for secure code execution
 * Perform data processing and file operations in sandboxed environments
+* Interact with web applications using Amazon Bedrock AgentCore Brower Tool
 
 ## Prerequisites
 
