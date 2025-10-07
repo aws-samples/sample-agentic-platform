@@ -23,9 +23,9 @@ app = FastAPI(title="Agentic Chat Agent")
 # Configure middleware
 configuration_server_middleware(app, path_prefix="/api/agentic-chat")
 
-
+@app.post("/invocations", response_model=AgenticResponse)
 @app.post("/invoke", response_model=AgenticResponse)
-@handle_exceptions(status_code=500, error_prefix="Agentic Chat Agent API Error")
+# @handle_exceptions(status_code=500, error_prefix="Agentic Chat Agent API Error")
 async def invoke(request: AgenticRequest) -> AgenticResponse:
     """
     Invoke the Agentic Chat agent with a standard response.
@@ -69,6 +69,7 @@ async def stream(request: AgenticRequest) -> StreamingResponse:
 
 
 @app.get("/health")
+@app.get("/ping")
 async def health() -> dict[str, str]:
     """
     Health check endpoint for Kubernetes probes.

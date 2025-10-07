@@ -8,3 +8,4 @@ litellm>=1.66.2
 pydantic>=2.10.6
 strands-agents[litellm,openai]>=0.1.6
 strands-agents-tools>=0.1.9
+aws-opentelemetry-distro>=0.10.1

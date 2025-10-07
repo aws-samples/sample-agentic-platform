@@ -47,9 +47,9 @@ resource "aws_s3_bucket_logging" "litellm_config" {
 locals {
   litellm_config_yaml = <<-EOT
 model_list:
-  - model_name: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+  - model_name: anthropic.claude-sonnet-4-20250514-v1:0
     litellm_params:
-      model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
+      model: bedrock/converse/us.anthropic.claude-sonnet-4-20250514-v1:0
 
   - model_name: us.anthropic.claude-3-5-haiku-20241022-v1:0
     litellm_params:

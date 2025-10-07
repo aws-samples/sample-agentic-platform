@@ -31,10 +31,11 @@ class StrandsAgenticChatAgent:
         # to use the proxy so it's preferred to use the OpenAIModel type when calling
         # the actual proxy vs. just using the SDK. 
         self.model = OpenAIModel(
-            model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+            model_id="anthropic.claude-sonnet-4-20250514-v1:0",
             client_args={
                 "api_key": litellm_info.api_key,
-                "base_url": litellm_info.api_endpoint
+                "base_url": litellm_info.api_endpoint,
+                "timeout": 30
             }
         )
 

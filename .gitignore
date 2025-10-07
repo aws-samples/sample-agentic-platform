@@ -12,6 +12,7 @@ infrastructure/terraform/backend.tf
 backendinfrastructure/base/backend.tf
 **/backend.tf
 **/backend-s3.tf
+**/tfplan
 
 # Local Terraform variable files
 **/terraform.tfvars

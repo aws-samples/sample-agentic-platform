@@ -100,7 +100,7 @@ fi
 
 # Build Docker image
 echo "Building Docker image..."
-docker build --platform linux/amd64 -t "$ECR_REPO_URI:$IMAGE_TAG" -f "$DOCKERFILE_PATH" .
+docker buildx build --platform linux/amd64,linux/arm64 -t "$ECR_REPO_URI:$IMAGE_TAG" -f "$DOCKERFILE_PATH" .
 
 if [ $? -ne 0 ]; then
     echo "Error: Failed to build Docker image"
