@@ -1,7 +1,5 @@
 # Infrastructure Deployment Guide
 
-> **⚠️ DEPRECATION NOTICE**: The `infrastructure/terraform/` directory is being deprecated in favor of the modular stack approach in `infrastructure/stacks/` and `infrastructure/modules/`.
-
 ## Overview
 
 This infrastructure deploys a complete agentic platform on AWS using Terraform. The platform includes EKS, PostgreSQL Aurora, Redis, Cognito authentication, and supporting services.
