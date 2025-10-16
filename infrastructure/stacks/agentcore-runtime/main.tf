@@ -23,10 +23,7 @@ resource "null_resource" "docker_image" {
   depends_on = [aws_ecr_repository.agent_repo]
 
   triggers = {
-    dockerfile_hash = filesha256("../../../docker/agentic-chat/Dockerfile")
-    core_hash = sha256(join("", [for f in fileset("../../../src/agentic_platform/core", "**") : filesha256("../../../src/agentic_platform/core/${f}")]))
-    tool_hash = sha256(join("", [for f in fileset("../../../src/agentic_platform/tool", "**") : filesha256("../../../src/agentic_platform/tool/${f}")]))
-    agent_hash = sha256(join("", [for f in fileset("../../../src/agentic_platform/agent/agentic_chat", "**") : filesha256("../../../src/agentic_platform/agent/agentic_chat/${f}")]))
+    always_run = timestamp()
   }
 
   provisioner "local-exec" {

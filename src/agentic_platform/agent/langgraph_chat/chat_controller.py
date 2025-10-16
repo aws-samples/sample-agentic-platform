@@ -6,8 +6,8 @@ from agentic_platform.core.models.memory_models import Message
 from agentic_platform.core.models.prompt_models import BasePrompt
 from agentic_platform.core.models.api_models import AgenticRequest, AgenticResponse
 
-from agentic_platform.chat.langgraph_chat.chat_workflow import LangGraphChat
-from agentic_platform.chat.langgraph_chat.chat_prompt import ChatPrompt
+from agentic_platform.agent.langgraph_chat.chat_workflow import LangGraphChat
+from agentic_platform.agent.langgraph_chat.chat_prompt import ChatPrompt
 
 # Instantiate the chat service so we don't recreate the graph on each request.
 chat_service = LangGraphChat()

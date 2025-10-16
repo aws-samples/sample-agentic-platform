@@ -12,20 +12,23 @@ SERVICE_NAME="$1"
 # Move to project root
 cd "$(dirname "$0")/.."
 
-# Check if docker directory exists for the service
+# Check for Dockerfile in src directory structure first, then fall back to docker directory
+SRC_DOCKERFILE_PATH="src/agentic_platform/agent/${SERVICE_NAME}/Dockerfile"
 DOCKER_DIR="docker/${SERVICE_NAME}"
-DOCKERFILE_PATH="${DOCKER_DIR}/Dockerfile"
+DOCKER_DOCKERFILE_PATH="${DOCKER_DIR}/Dockerfile"
 
-if [[ ! -d "$DOCKER_DIR" ]]; then
-    echo "Error: Docker directory not found at $DOCKER_DIR"
-    echo "Available services:"
+if [[ -f "$SRC_DOCKERFILE_PATH" ]]; then
+    DOCKERFILE_PATH="$SRC_DOCKERFILE_PATH"
+    echo "Using Dockerfile from src directory: $DOCKERFILE_PATH"
+elif [[ -f "$DOCKER_DOCKERFILE_PATH" ]]; then
+    DOCKERFILE_PATH="$DOCKER_DOCKERFILE_PATH"
+    echo "Using Dockerfile from docker directory: $DOCKERFILE_PATH"
+else
+    echo "Error: Dockerfile not found at $SRC_DOCKERFILE_PATH or $DOCKER_DOCKERFILE_PATH"
+    echo "Available services in docker/:"
     ls -1 docker/ 2>/dev/null | grep -v "^$" || echo "  No services found in docker/ directory"
-    exit 1
-fi
-
-# Check if Dockerfile exists
-if [[ ! -f "$DOCKERFILE_PATH" ]]; then
-    echo "Error: Dockerfile not found at $DOCKERFILE_PATH"
+    echo "Available services in src/agentic_platform/agent/:"
+    ls -1 src/agentic_platform/agent/ 2>/dev/null | grep -v "^$" || echo "  No services found in src/agentic_platform/agent/ directory"
     exit 1
 fi
 

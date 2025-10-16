@@ -1,0 +1,11 @@
+########################################################
+# Core Configuration
+########################################################
+
+agent_name        = "agentic_chat"
+agent_description = "AgentCore runtime for agentic-chat"
+
+# Pass environment variables as neeeded.
+environment_variables = {
+    "YOUR_ENV_VARS_HERE": "YOUR_ENV_VARS_HERE"
+}

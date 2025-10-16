@@ -30,7 +30,7 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
   }
 
   environment_variables = var.runtime_environment_variables
-  
+
   authorizer_configuration = var.runtime_authorizer_configuration != null ? {
     custom_jwt_authorizer = {
       allowed_audience = var.runtime_authorizer_configuration.custom_jwt_authorizer.allowed_audience
@@ -41,13 +41,18 @@ resource "awscc_bedrockagentcore_runtime" "agent_runtime" {
 
   protocol_configuration = var.runtime_protocol_configuration
   tags                   = var.runtime_tags
+
+  depends_on = [
+    aws_iam_role.runtime_role,
+    aws_iam_role_policy.runtime_role_policy
+  ]
 }
 
 # IAM Role for Agent Runtime
 resource "aws_iam_role" "runtime_role" {
   count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
   name  = "${random_string.solution_prefix.result}-bedrock-agent-runtime-role"
-  
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -67,15 +72,15 @@ resource "aws_iam_role" "runtime_role" {
 
 # IAM Policy for Agent Runtime
 resource "aws_iam_role_policy" "runtime_role_policy" {
-  count      = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
-  name       = "${random_string.solution_prefix.result}-bedrock-agent-runtime-policy"
-  role       = aws_iam_role.runtime_role[0].name
-  
+  count = local.create_runtime && var.runtime_role_arn == null ? 1 : 0
+  name  = "${random_string.solution_prefix.result}-bedrock-agent-runtime-policy"
+  role  = aws_iam_role.runtime_role[0].name
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid = "ECRImageAccess"
+        Sid    = "ECRImageAccess"
         Effect = "Allow"
         Action = [
           "ecr:BatchGetImage",
@@ -115,7 +120,7 @@ resource "aws_iam_role_policy" "runtime_role_policy" {
         ]
       },
       {
-        Sid = "ECRTokenAccess"
+        Sid    = "ECRTokenAccess"
         Effect = "Allow"
         Action = [
           "ecr:GetAuthorizationToken"
@@ -133,9 +138,9 @@ resource "aws_iam_role_policy" "runtime_role_policy" {
         Resource = "*"
       },
       {
-        Effect = "Allow"
+        Effect   = "Allow"
         Resource = "*"
-        Action = "cloudwatch:PutMetricData"
+        Action   = "cloudwatch:PutMetricData"
         Condition = {
           StringEquals = {
             "cloudwatch:namespace" = "bedrock-agentcore"
@@ -143,7 +148,7 @@ resource "aws_iam_role_policy" "runtime_role_policy" {
         }
       },
       {
-        Sid = "GetAgentAccessToken"
+        Sid    = "GetAgentAccessToken"
         Effect = "Allow"
         Action = [
           "bedrock-agentcore:GetWorkloadAccessToken",
@@ -156,7 +161,7 @@ resource "aws_iam_role_policy" "runtime_role_policy" {
         ]
       },
       {
-        Sid = "BedrockModelInvocation"
+        Sid    = "BedrockModelInvocation"
         Effect = "Allow"
         Action = [
           "bedrock:InvokeModel",
@@ -178,9 +183,9 @@ locals {
 }
 
 resource "awscc_bedrockagentcore_runtime_endpoint" "agent_runtime_endpoint" {
-  count              = local.create_runtime_endpoint ? 1 : 0
-  name               = "${random_string.solution_prefix.result}_${var.runtime_endpoint_name}"
-  description        = var.runtime_endpoint_description
-  agent_runtime_id   = var.runtime_endpoint_agent_runtime_id != null ? var.runtime_endpoint_agent_runtime_id : try(awscc_bedrockagentcore_runtime.agent_runtime[0].agent_runtime_id, null)
-  tags               = var.runtime_endpoint_tags
+  count            = local.create_runtime_endpoint ? 1 : 0
+  name             = "${random_string.solution_prefix.result}_${var.runtime_endpoint_name}"
+  description      = var.runtime_endpoint_description
+  agent_runtime_id = var.runtime_endpoint_agent_runtime_id != null ? var.runtime_endpoint_agent_runtime_id : try(awscc_bedrockagentcore_runtime.agent_runtime[0].agent_runtime_id, null)
+  tags             = var.runtime_endpoint_tags
 }
