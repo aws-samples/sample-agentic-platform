@@ -83,7 +83,7 @@ variable "postgres_instance_count" {
 variable "postgres_instance_class" {
   description = "Instance class for Aurora PostgreSQL"
   type        = string
-  default     = "db.serverless"
+  default     = "db.t4g.medium"
 }
 
 variable "postgres_deletion_protection" {
@@ -117,7 +117,7 @@ variable "redis_engine_version" {
 variable "redis_num_cache_clusters" {
   description = "Number of cache clusters in the replication group"
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "redis_maintenance_window" {
