@@ -40,7 +40,21 @@ We've intentionally left out the CI/CD role creation in the bootstrap template t
 
 These templates can be used after you review them and determine they meet your security requirements. They provide a starting point for the required IAM roles but should be customized based on your organization's security policies and least-privilege principles.
 
-**Security Warning:** These sample roles include broad permissions necessary for infrastructure deployment. Review and restrict permissions according to your security requirements before using in production environments.
+**Security Warning:** These sample roles include broad permissions necessary for infrastructure deployment. Review and restrict permissions according to your security requirements before using in production environments. IF YOU HAVE COMPLED THE REVIEW YOU CAN:
+```bash
+#Create the federated role for EKS
+aws cloudformation create-stack \
+  --stack-name agentptfm-federated-role \
+  --template-body file://agentptfm-federated-role.yaml \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+```bash
+#Create the CICD role
+aws cloudformation create-stack \
+  --stack-name agentptfm-cicd-role \
+  --template-body file://agentptfm-cicd-role.yaml \
+  --capabilities CAPABILITY_NAMED_IAM
+```
 
 
 #### Deploying from Computer
