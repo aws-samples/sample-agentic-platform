@@ -1,23 +1,22 @@
 name: Build and Push Services
 
 # Workflow is currently disabled - uncomment 'on:' section below to re-enable
-#on:
-#  workflow_dispatch: # This allows manual triggering only, but won't auto-trigger
-
-#enable this block for github actions to build in CI
 on:
-  push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      services:
-        description: 'Services to build (comma-separated, or "all")'
-        required: false
-        default: 'changed'
-        type: string
+  workflow_dispatch: # This allows manual triggering only, but won't auto-trigger
+
+# on:
+#   push:
+#     branches: [ main, develop ]
+#     tags: [ 'v*' ]
+#   pull_request:
+#     branches: [ main ]
+#   workflow_dispatch:
+#     inputs:
+#       services:
+#         description: 'Services to build (comma-separated, or "all")'
+#         required: false
+#         default: 'changed'
+#         type: string
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
