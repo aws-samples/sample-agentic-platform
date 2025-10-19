@@ -1,11 +1,14 @@
 #!/bin/bash
 
+# Echo how the script was called
+echo "Called: $0 $*"
+
 # Array of gateway services
 GATEWAYS=(
     "memory-gateway"
     "retrieval-gateway"
 )
-
+TYPE="service" #hardcoded as gateways are "service"
 BUILD_FLAG=""
 
 # Check for build flag
@@ -24,7 +27,7 @@ for gateway in "${GATEWAYS[@]}"; do
     echo "🚀 Deploying $gateway..."
     echo "----------------------------------------"
     
-    ./deploy/deploy-application.sh "$gateway" $BUILD_FLAG
+    ./deploy/deploy-application.sh "$gateway" $TYPE $BUILD_FLAG
     
     if [ $? -eq 0 ]; then
         echo "✅ $gateway deployed successfully"

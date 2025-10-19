@@ -1,24 +1,38 @@
 #!/bin/bash
 
-# Check if service name is provided
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-    echo "Usage: $0 <service-name> [--build]"
+# Echo how the script was called
+echo "Called: $0 $*"
+
+# Check if service name and type are provided and validate arguments
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <service-name> <type> [--build]"
     echo "  --build: Build and push container before deploying"
     exit 1
-fi
-
-SERVICE_NAME=$1
-BUILD_CONTAINER=false
-
-# Check for build flag
-if [ $# -eq 2 ] && [ "$2" = "--build" ]; then
+elif [ $# -eq 2 ]; then
+    SERVICE_NAME=$1
+    TYPE=$2
+    BUILD_CONTAINER=false
+elif [ $# -eq 3 ]; then
+    if [ "$3" != "--build" ]; then
+        echo "Error: Invalid third argument. Only '--build' is allowed."
+        echo "Usage: $0 <service-name> <type> [--build]"
+        echo "  --build: Build and push container before deploying"
+        exit 1
+    fi
+    SERVICE_NAME=$1
+    TYPE=$2
     BUILD_CONTAINER=true
+else
+    echo "Error: Too many arguments provided."
+    echo "Usage: $0 <service-name> <type> [--build]"
+    echo "  --build: Build and push container before deploying"
+    exit 1
 fi
 
 # Build and push the container if requested
 if [ "$BUILD_CONTAINER" = true ]; then
     echo "Building and pushing container..."
-    ./deploy/build-container.sh $SERVICE_NAME
+    ./deploy/build-container.sh $SERVICE_NAME $TYPE
     if [ $? -ne 0 ]; then
         echo "Error: Container build failed"
         exit 1

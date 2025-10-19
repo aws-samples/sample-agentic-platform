@@ -48,6 +48,10 @@ serviceAccount:
   name: "retrieval-gateway-sa"
   create: true
   irsaRoleName: "retrieval-gateway-role"  # Role name without prefix
+  irsaConfigKey: RETRIEVAL_GATEWAY_ROLE_ARN
 
-# Memory gateway role
-irsaConfigKey: RETRIEVAL_GATEWAY_ROLE_ARN
+
+
+# Agent secret configuration for external secrets
+agentSecret:
+  configKey: "AGENT_LITELLM_SECRET_ARN"

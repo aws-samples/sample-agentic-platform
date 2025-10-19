@@ -14,7 +14,21 @@ This guide covers deploying the sample agentic platform to AWS. The platform use
 - [SSM Plugin for AWS CLI](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) (for port forwarding)
 - [uv](https://github.com/astral-sh/uv) for Python development
 - [Docker](https://docs.docker.com/engine/install/)
+  
+  After installing Docker, set up multi-platform building support:
+  ```bash
+  # Create a multi-platform builder
+  docker buildx create --name multiarch --driver docker-container --platform linux/amd64,linux/arm64 --bootstrap
+  
+  # Use the multi-platform builder
+  docker buildx use multiarch
+  
+  # Verify the setup (optional - shows available builders and platforms)
+  docker buildx ls
+  ```
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/docs/intro/install/) for Kubernetes package management
+
 
 ## Installation
 
@@ -30,7 +44,7 @@ cd sample-agentic-platform
 
 Use the automated bootstrap for production deployments. This approach deploys infrastructure from within the VPC for security and keeps the EKS cluster private.
 
-**Note:** This option is currently Work In Progress (WIP).
+**Note:** This option is currently Work In Progress (WIP). If you encounter any bugs or blockers please create an issue: https://github.com/aws-samples/sample-agentic-platform/issues
 
 ```bash
 # Follow the bootstrap deployment guide

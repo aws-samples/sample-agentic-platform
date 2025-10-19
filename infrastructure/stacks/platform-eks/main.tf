@@ -29,6 +29,10 @@ terraform {
       source  = "hashicorp/helm"
       version = ">= 2.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0"
+    }
   }
 }
 
@@ -44,9 +48,20 @@ provider "kubernetes" {
   token                  = data.aws_eks_cluster_auth.main.token
 }
 
-# Get EKS cluster auth token
+# Null resource to ensure proper dependency ordering
+resource "null_resource" "wait_for_access_entries" {
+  # This triggers when access entries are ready
+  triggers = {
+    access_entries_ready = module.eks.access_entries_ready
+  }
+}
+
+# Get EKS cluster auth token - only after access entries are ready
 data "aws_eks_cluster_auth" "main" {
   name = module.eks.cluster_name
+  
+  # Explicit dependency to ensure access entries are created first
+  depends_on = [null_resource.wait_for_access_entries]
 }
 
 provider "helm" {

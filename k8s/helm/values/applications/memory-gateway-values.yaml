@@ -53,3 +53,8 @@ serviceAccount:
 # Provider: bedrock_agentcore or postgres
 configDefaults:
   MEMORY_PROVIDER: "bedrock_agentcore"
+
+
+# Agent secret configuration for external secrets
+agentSecret:
+  configKey: "AGENT_LITELLM_SECRET_ARN"
