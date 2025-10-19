@@ -4,6 +4,7 @@ name: Build and Push Services
 #on:
 #  workflow_dispatch: # This allows manual triggering only, but won't auto-trigger
 
+#enable this block for github actions to build in CI
 on:
   push:
     branches: [ main, develop ]
