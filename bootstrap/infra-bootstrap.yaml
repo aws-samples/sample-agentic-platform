@@ -591,7 +591,6 @@ Resources:
                   # EKS Config
                   enable_eks_public_access    = true
                   deploy_inside_vpc           = false
-                  additional_admin_role_arns = ["arn:aws:iam::${AWS::AccountId}:role/${CICDRoleName}"]
                   # additional_admin_role_arns = ["<ARN for your AgenticPlatformCICDRole>","<YOUR_IAM_PRINCIPAL_ARN"]
                   
                   # Networking Variables (from CloudFormation VPC)

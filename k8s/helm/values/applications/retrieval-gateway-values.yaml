@@ -24,7 +24,7 @@ fullnameOverride: "retrieval-gateway"
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8000
+  targetPort: 8080 # had to change port value from 8000 to 8080 to match Dockerfile
 
 env:
   - name: PYTHONPATH

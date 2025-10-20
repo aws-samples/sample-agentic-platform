@@ -187,6 +187,18 @@ After the bootstrap stack is deployed, you need to configure additional admin ro
 
 **Important:** This configuration is required for proper EKS cluster access. Without it, you may encounter permission issues when deploying applications.
 
+3.1 **Continued CodeBuild configuration:** (optional if you have forked your ownn giuthub repo)
+    Within the CodeBuild UI for your build, after clicking into edit, find and expand the "Additional configuration" section
+    Scroll down and find the "Environment Variables"
+    Edit the value for "REPO_URL" to be your forked repo for example:
+      CURRENT VALUE:https://github.com/aws-samples/sample-agentic-platform
+      YOUR VALUE:  https://github.com/< YOUR ORG or YOUR PERSONAL GITHUB USER ID >/< NAME OF THE REPO YOU JUST CREATED >
+    Note: You do not need the ".git" at the end of the URL
+    Edit the value for "TF_PATH" to be your path for example:
+      CURRENT VALUE: sample-agentic-platform/infrastructure/stacks/platform-eks
+      YOU VALUE: < NAME OF THE REPO YOU JUST CREATED >/infrastructure/stacks/platform-eks
+      
+
 ## 4. Test the Deployment Manually
 
 After updating the configuration, manually trigger the CodeBuild project from the AWS console to verify everything works correctly:
@@ -308,6 +320,7 @@ Deploy the LiteLLM gateway for LLM model management from the root directory:
 ./deploy/deploy-litellm.sh
 kubectl get configmap litellm-config
 kubectl get secret litellm-secret
+kubectl get externalsecrets
 kubectl get pods #ensure its running, if not then you should NOT proceed beyond this point.
 # if not running you can take a look at the pod:
 # kubectl logs -f <pod_name>
@@ -319,6 +332,23 @@ If you want to use the memory or retrieval gateways, run:
 
 ```bash
 ./deploy/deploy-gateways.sh --build
+kubectl get configmap memory-gateway-config
+kubectl get configmap retrieval-gateway-config
+kubectl get secret memory-gateway-agent-secret
+kubectl get secret retrieval-gateway-agent-secret
+kubectl get externalsecrets
+kubectl get pods
+```
+
+
+```bash
+# Test them
+kubectl port-forward svc/memory-gateway 8091:80
+kubectl port-forward svc/retrieval-gateway 8092:80
+
+# Test endpoints (check their server.py files for exact paths)
+curl http://localhost:8091/api/memory-gateway/health
+curl http://localhost:8092/api/retrieval-gateway/health
 ```
 
 **Note:** The --build flag will build the Docker images. If you're running this locally and encounter Docker issues, you can omit the flag to use pre-built images.
@@ -339,6 +369,13 @@ chmod +x ./bootstrap/langfuse-bootstrap.sh
 # Deploy LangFuse via Helm
 . ./bootstrap/langfuse-bootstrap.sh
 ```
+
+**Note:** Tearing down/removal of Langfuse can be achieved by passing the --cleanup flag to the langfuse-bootstrap.sh script. If during cleanup the script seems to hang on namesapce deletion you may have finalizers that need manual adjustment. The following is an example only, your commands will differ:
+```bash
+# kubectl get namespace langfuse -o yaml | grep -A 10 finalizers
+# kubectl patch ingress langfuse -n langfuse -p '{"metadata":{"finalizers":null}}' --type=merge
+```
+
 
 ## 8. Deploy Applications
 
@@ -362,12 +399,14 @@ Now deploy some apps:
 After the infrastructure is deployed and you have kubectl access configured (either locally or via code server), run the database migrations:
 
 ```bash
-./deploy/run-migrations.sh
+uv run ./deploy/run-migrations.sh
 ```
 
 ## 10. Testing the Deployment
 
 ### Create Test User and Generate Token
+USER_POOL_ID can be found in the codebuild logs under: "cognito_user_pool_id"
+CLIENT_ID can be found in the codebuild logs under: "cognito_web_client_id"
 
 ```bash
 # Create test user
@@ -384,19 +423,30 @@ Save that bearer token value (we'll use it in our tests).
 ```bash
 # Port forward to a specific service
 kubectl port-forward svc/[SERVICE_NAME] 8090:80
-
+export YOUR_TOKEN=<the value of the bearer token from above>
 # Test langgraph-chat app
 curl -X POST http://localhost:8090/chat \
-  -H "Authorization: Bearer [YOUR_TOKEN]" \
-  -H "Content-Type: application/json" \
-  -d '{"message": {"role": "user","content": [{"type": "text","text": "hello"}]}}'
+-H "Authorization: Bearer $YOUR_TOKEN" \
+-H "Content-Type: application/json" \
+-d '{
+  "message": {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Hello, I just successfully deployed my langgraph-chat agent on AWS!"
+      }
+    ]
+  }
+}'
+
 
 # Test agentic-chat app
-kubectl port-forward svc/agentic-chat 8090:80
-curl -X POST http://localhost:8090/api/agentic-chat/invoke \
-  -H "Authorization: Bearer [YOUR_TOKEN]" \
+kubectl port-forward svc/agentic-chat 8099:80
+curl -X POST http://localhost:8099/api/agentic-chat/invoke \
+  -H "Authorization: Bearer $YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"message": {"role": "user","content": [{"type": "text", "text": "hello"}]},"session_id": "test-session-123"}'
+  -d '{"message": {"role": "user","content": [{"type": "text", "text": "Hello, I just successfully deployed my agentic-chat agent on AWS!"}]},"session_id": "test-session-123"}'
 ```
 
 # Conclusion
