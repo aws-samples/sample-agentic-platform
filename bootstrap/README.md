@@ -444,9 +444,9 @@ curl -X POST http://localhost:8090/chat \
 # Test agentic-chat app
 kubectl port-forward svc/agentic-chat 8099:80
 curl -X POST http://localhost:8099/api/agentic-chat/invoke \
-  -H "Authorization: Bearer $YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message": {"role": "user","content": [{"type": "text", "text": "Hello, I just successfully deployed my agentic-chat agent on AWS!"}]},"session_id": "test-session-123"}'
+-H "Authorization: Bearer $YOUR_TOKEN" \
+-H "Content-Type: application/json" \
+-d '{"message": {"role": "user","content": [{"type": "text", "text": "Hello, I just successfully deployed my agentic-chat agent on AWS!"}]},"session_id": "test-session-123"}'
 ```
 
 # Conclusion
