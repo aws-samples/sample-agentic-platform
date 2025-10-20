@@ -18,14 +18,14 @@ To get started, you can run this CloudFormation by (1) Deploying from your compu
 #### Pre-Reqs
 
 1. An AWS account
-2. An IAM role (not user) you can use to give access to the Amazon EKS cluster and has access to your project KMS key
+2. An IAM role (not user) you can use as an administrator role for the agentcore platform and KMS key (if using). Generally we recommend this being the same role as the one used to deploy this CFN stack.
 3. An IAM role (not user) for your CI/CD pipeline to deploy the Terraform via CodeBuild. **This role must have a trust relationship with codebuild.amazonaws.com and appropriate permissions to deploy infrastructure**
 
 We've intentionally left out the CI/CD role creation in the bootstrap template to give flexibility to the implementor on how they want to configure that role. The role needs elevated privileges to deploy the Terraform infrastructure. You can use tools like AWS IAM Access Analyzer or projects like Role Vending Machine [here](https://github.com/aws-samples/role-vending-machine) to help you create a role with the appropriate permissions.
 
 #### Deploying from computer
 
-To deploy from your computer, run the following command in the sample-agentic-platform/bootstrap directory. Make sure to replace your FederatedRoleName parameter with the role you're using.
+To deploy from your computer, run the following command in the sample-agentic-platform/bootstrap directory. Make sure to replace your AdminRoleName parameter with a role that can be used to adminster the KMS if selecting. Typically you'll want this to be the same role as the one you're assuming to deploy the CFN stack.
 
 ```bash
 aws cloudformation create-stack \
@@ -33,6 +33,7 @@ aws cloudformation create-stack \
   --template-body file://agentcore-platform-bootstrap.yaml \
   --parameters \
     ParameterKey=CICDRoleName,ParameterValue=<YOUR CICD ROLE NAME> \
+    ParameterKey=PlatformAdminRoleName,ParameterValue=<YOUR ROLE NAME> \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 

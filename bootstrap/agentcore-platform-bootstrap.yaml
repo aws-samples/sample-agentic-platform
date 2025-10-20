@@ -14,9 +14,9 @@ Parameters:
     Default: sample-agentic-platform/infrastructure/stacks/platform-agentcore
     Description: Path to the Terraform code
 
-  FederatedRoleName:
+  PlatformAdminRoleName:
     Type: String
-    Description: The name of the role for whom these resources are being created.
+    Description: Recommended to use the same role name as the one used to deploy this stack. This role will have permissions over the platform (like KMS key etc..). 
 
   CICDRoleName:
     Type: String
@@ -657,7 +657,7 @@ Resources:
             Principal:
               AWS: 
                 - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
-                - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${FederatedRoleName}'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${PlatformAdminRoleName}'
             Action:
               - kms:Create*
               - kms:Describe*
