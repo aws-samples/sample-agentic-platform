@@ -19,7 +19,6 @@ This release improves the sample agentic platform's deployment process, document
 - **EKS Configuration**: Added support for additional admin role ARNs for better access control
 - **Bootstrap Template**: Enhanced with EKS public access configuration and admin role management
 - **Access Control**: Implemented proper dependency ordering for EKS access entries
-- **Database Migrations**: Made run-migrations.sh executable for easier deployment
 
 ### Gateway and Service Enhancements
 - **Service Endpoints**: Updated all gateway endpoints to include proper API paths (`/api/gateway-name`)
@@ -45,68 +44,17 @@ This release improves the sample agentic platform's deployment process, document
   - Updated build-container.sh to use `--push` flag for direct ECR deployment
   - Improved build process with proper multi-platform builder setup
 - **Script improvements**:
-  - Added call tracing to show exactly how scripts are invoked for better debugging
   - Fixed parameter ordering in deploy-gateways.sh to match new validation requirements
   - Enhanced error messages and usage instructions across all deployment scripts
 
+
+## Issues Resolved
+- #11 - Fixed manual deployment process issues
+- #9 - Corrected deployment instruction ordering
+- #6 - Clarified EKS console role creation during initial deployment
+
 ## Technical Details
-
-### Files Modified (22 files, +368 additions, -49 deletions)
-
-**Documentation:**
-- `DEPLOYMENT.md`: Added Helm dependency
-- `bootstrap/README.md`: Major expansion with 10 deployment sections
-- `bootstrap/infra-bootstrap.yaml`: EKS configuration enhancements
-
-**Infrastructure:**
-- `infrastructure/modules/eks/outputs.tf`: Added access entries dependency tracking
-- `infrastructure/stacks/platform-eks/main.tf`: Improved provider dependency management
-- `infrastructure/modules/irsa/`: Enhanced IAM policies for both gateways
-- `infrastructure/modules/litellm/agent-secret.tf`: Fixed key generation
-
-**Kubernetes:**
-- `k8s/helm/charts/agentic-service/templates/`: Updated secret naming conventions
-- `k8s/helm/values/applications/`: Standardized endpoint configurations across 10+ applications
-
-## Breaking Changes
-
-⚠️ **Important**: This release contains breaking changes that require migration steps.
 
 - Gateway endpoint URLs now include API path prefixes (`/api/gateway-name`)
 - Secret naming convention changed to app-specific format
 - LiteLLM keys now use proper `sk-` prefix instead of placeholder values
-
-## Migration Guide
-
-Existing deployments will need to:
-
-1. **Update Gateway Endpoints**: Applications using gateway services must update their configuration:
-   ```yaml
-   # Old
-   RETRIEVAL_GATEWAY_ENDPOINT: "http://retrieval-gateway.default.svc.cluster.local:80"
-   
-   # New
-   RETRIEVAL_GATEWAY_ENDPOINT: "http://retrieval-gateway.default.svc.cluster.local:80/api/retrieval-gateway"
-   ```
-
-2. **Redeploy Services**: Redeploy all applications to pick up new secret naming conventions
-
-3. **Configure EKS Access**: Ensure proper IAM roles are configured for EKS cluster access using the new documentation
-
-## Testing
-
-The release includes comprehensive testing procedures:
-- User creation and token generation scripts
-- Service connectivity testing via port forwarding
-- Application-specific API testing examples
-
-## Security Improvements
-
-- Enhanced IAM policies with least-privilege access
-- Proper secret management with app-specific naming
-- Security warnings added to documentation for production deployments
-- Sample CloudFormation templates provided with security considerations
-
-
-
----
