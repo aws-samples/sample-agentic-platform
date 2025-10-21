@@ -17,3 +17,13 @@ output "ecr_repository_name" {
   description = "Name of the ECR repository"
   value       = aws_ecr_repository.agent_repo.name
 }
+
+output "memory_arn" {
+  description = "ARN of the created runtime"
+  value       = module.agentcore-memory.memory_arn
+}
+
+output "memory_id" {
+  description = "ARN of the created runtime endpoint"
+  value       = module.agentcore-memory.memory_id
+}

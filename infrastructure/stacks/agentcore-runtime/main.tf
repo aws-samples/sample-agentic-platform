@@ -32,6 +32,14 @@ resource "null_resource" "docker_image" {
   }
 }
 
+module "agentcore-memory" {
+  source = "../../modules/agentcore-memory"
+
+  # variables
+  memory_name = "${local.sanitized_agent_name}_memory"
+  expiration_duration = 7
+}
+
 module "agentcore" {
   source  = "../../modules/agentcore"
 
