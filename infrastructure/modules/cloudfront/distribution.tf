@@ -30,8 +30,8 @@ resource "aws_cloudfront_distribution" "spa_website" {
   dynamic "origin" {
     for_each = aws_cloudfront_vpc_origin.alb
     content {
-      domain_name = "vpc-origin-${origin.key}.example.com"  # Placeholder domain
-      origin_id   = "VPC-0"
+      domain_name = var.load_balancer_dns_name
+      origin_id   = "VPC-${origin.key}"
       
       vpc_origin_config {
         vpc_origin_id = origin.value.id

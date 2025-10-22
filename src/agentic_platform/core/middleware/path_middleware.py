@@ -58,9 +58,9 @@ class PathTransformMiddleware(BaseHTTPMiddleware):
             request.state.original_path = original_path
             request.state.path_prefix = self.original_prefix
             
-            print(f"Transformed path from {original_path} to {endpoint_path}")
-        else:
-            logger.info(f"Path {original_path} did not match pattern, no transformation applied")
+            # print(f"Transformed path from {original_path} to {endpoint_path}")
+        # else:
+        #     logger.info(f"Path {original_path} did not match pattern, no transformation applied")
         
         # Continue processing the request with the modified path
         response: Response = await call_next(request)

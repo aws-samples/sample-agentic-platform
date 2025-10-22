@@ -29,6 +29,12 @@ variable "environment" {
   default     = "dev"
 }
 
+variable "load_balancer_dns_name" {
+  description = "DNS name of the load balancer for VPC origin"
+  type        = string
+  default     = ""
+}
+
 variable "vpc_origin_arns" {
   description = "List of VPC origin ARNs (e.g., ALB ARNs) to create VPC origins for"
   type        = list(string)

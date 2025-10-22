@@ -171,7 +171,20 @@ resource "aws_iam_role_policy" "runtime_role_policy" {
           "arn:aws:bedrock:*::foundation-model/*",
           "arn:aws:bedrock:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:*"
         ]
-      }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:Retrieve",
+          "bedrock:RetrieveAndGenerate",
+          "bedrock:ListKnowledgeBases",
+          "bedrock:GetKnowledgeBase"
+        ]
+        Resource = [
+          # Allow operations on all knowledge bases in the account across all regions
+          "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:knowledge-base/*"
+        ]
+      },
     ]
   })
 }

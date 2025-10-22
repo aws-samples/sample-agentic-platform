@@ -46,8 +46,7 @@ dependencies = [
     "strands-agents-tools>=0.1.9",
     "psycopg2-binary>=2.9.10",
     "langchain-litellm>=0.2.2",
-    "bedrock-agentcore>=0.1.5",
-    "bedrock-agentcore-starter-toolkit>=0.1.13",
+    "bedrock-agentcore>=1.0.3",
 ]
 
 [tool.uv.workspace]

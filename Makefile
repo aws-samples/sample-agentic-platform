@@ -11,6 +11,7 @@
 .PHONY: knowledge-base
 .PHONY: pydanticai-agent
 .PHONY: agentic_chat
+.PHONY: agentic-rag
 # Makefile for running servers locally with UV and the correct environment variables.
 # Make sure to fill in your .env file with the correct values.
 
@@ -58,6 +59,10 @@ llm-gateway:
 memory-gateway:
 	cd src && \
 	uv run --env-file agentic_platform/service/memory_gateway/.env -- uvicorn agentic_platform.service.memory_gateway.server:app --reload
+
+agentic-rag:
+	cd src && \
+	uv run --env-file agentic_platform/agent/agentic_rag/.env -- uvicorn agentic_platform.agent.agentic_rag.server:app --reload --port 8004
 
 retrieval-gateway:
 	cd src && \

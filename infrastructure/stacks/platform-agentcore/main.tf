@@ -291,7 +291,8 @@ module "cloudfront_spa" {
   s3_bucket_regional_domain_name  = module.s3_spa_website.bucket_regional_domain_name
 
   # VPC origins configuration
-  vpc_origin_arns = [module.ecs_litellm.load_balancer_arn]
+  vpc_origin_arns         = [module.ecs_litellm.load_balancer_arn]
+  load_balancer_dns_name  = module.ecs_litellm.load_balancer_dns_name
 }
 
 ########################################################

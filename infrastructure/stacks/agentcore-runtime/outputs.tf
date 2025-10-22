@@ -6,7 +6,7 @@ output "runtime_arn" {
 output "runtime_endpoint_arn" {
   description = "ARN of the created runtime endpoint"
   value       = module.agentcore.agent_runtime_endpoint_arn
-}
+} 
 
 output "ecr_repository_url" {
   description = "URL of the ECR repository"
