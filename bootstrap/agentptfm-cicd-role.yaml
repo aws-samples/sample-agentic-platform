@@ -1,0 +1,325 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Creates the CICD role for Agentic Platform infrastructure deployment'
+
+Parameters:
+  RoleName:
+    Type: String
+    Default: "AgenticPlatformCICDRole"
+    Description: Name of the CICD role
+    
+  Environment:
+    Type: String
+    Default: "dev"
+    Description: Environment name
+    
+  StackName:
+    Type: String
+    Default: "agentic-platform"
+    Description: Name prefix for all resources
+
+Resources:
+  CICDRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CICDTerraformDeploymentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # S3 permissions for Terraform state and website buckets
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource: '*'
+              
+              # DynamoDB for Terraform state locking
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:CreateTable
+                  - dynamodb:DescribeTable
+                  - dynamodb:TagResource
+                Resource: 
+                  - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/terraform-state-lock-*"
+              
+              # EKS cluster management
+              - Effect: Allow
+                Action:
+                  - eks:*
+                Resource: '*'
+              
+              # EC2 permissions for EKS nodes and networking
+              - Effect: Allow
+                Action:
+                  - ec2:*
+                Resource: '*'
+              
+              # IAM permissions for EKS service roles and policies
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:ListRoles
+                  - iam:PassRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:CreatePolicy
+                  - iam:DeletePolicy
+                  - iam:GetPolicy
+                  - iam:GetPolicyVersion
+                  - iam:ListPolicies
+                  - iam:ListPolicyVersions
+                  - iam:CreatePolicyVersion
+                  - iam:DeletePolicyVersion
+                  - iam:SetDefaultPolicyVersion
+                  - iam:CreateInstanceProfile
+                  - iam:DeleteInstanceProfile
+                  - iam:GetInstanceProfile
+                  - iam:ListInstanceProfiles
+                  - iam:ListInstanceProfilesForRole
+                  - iam:AddRoleToInstanceProfile
+                  - iam:RemoveRoleFromInstanceProfile
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:ListRoleTags
+                  - iam:TagInstanceProfile
+                  - iam:UntagInstanceProfile
+                  - iam:ListInstanceProfileTags
+                  - iam:TagPolicy
+                  - iam:UntagPolicy
+                  - iam:ListPolicyTags
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:DeleteOpenIDConnectProvider
+                  - iam:GetOpenIDConnectProvider
+                  - iam:ListOpenIDConnectProviders
+                  - iam:TagOpenIDConnectProvider
+                  - iam:UntagOpenIDConnectProvider
+                  - iam:UpdateOpenIDConnectProviderThumbprint
+                Resource: '*'
+              
+              # Auto Scaling for EKS node groups
+              - Effect: Allow
+                Action:
+                  - autoscaling:*
+                Resource: '*'
+              
+              # Application Load Balancer
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:*
+                Resource: '*'
+              
+              # CloudWatch Logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutRetentionPolicy
+                  - logs:TagLogGroup
+                  - logs:UntagLogGroup
+                  - logs:ListTagsLogGroup
+                  - logs:ListTagsForResource
+                  - logs:TagResource
+                  - logs:UntagResource
+                Resource: '*'
+              
+              # KMS permissions for encryption
+              - Effect: Allow
+                Action:
+                  - kms:*
+                Resource: '*'
+              
+              # Systems Manager Parameter Store
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                  - ssm:DescribeParameters
+                  - ssm:AddTagsToResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:ListTagsForResource
+                Resource: '*'
+              
+              # Secrets Manager
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:DeleteSecret
+                  - secretsmanager:UpdateSecretVersionStage
+                  - secretsmanager:TagResource
+                  - secretsmanager:UntagResource
+                  - secretsmanager:GetResourcePolicy
+                  - secretsmanager:PutResourcePolicy
+                  - secretsmanager:DeleteResourcePolicy
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:RestoreSecret
+                Resource: '*'
+              
+              # CloudFormation (for Terraform AWS provider)
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:GetTemplate
+                Resource: '*'
+              
+              # STS for assume role operations
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                  - sts:GetCallerIdentity
+                Resource: '*'
+              
+              # Route53 for DNS (if needed)
+              - Effect: Allow
+                Action:
+                  - route53:*
+                Resource: '*'
+              
+              # Certificate Manager
+              - Effect: Allow
+                Action:
+                  - acm:*
+                Resource: '*'
+              
+              # CloudFront permissions for SPA distribution
+              - Effect: Allow
+                Action:
+                  - cloudfront:ListCachePolicies
+                  - cloudfront:GetCachePolicy
+                  - cloudfront:ListOriginRequestPolicies
+                  - cloudfront:GetOriginRequestPolicy
+                  - cloudfront:ListResponseHeadersPolicies
+                  - cloudfront:GetResponseHeadersPolicy
+                  - cloudfront:CreateResponseHeadersPolicy
+                  - cloudfront:UpdateResponseHeadersPolicy
+                  - cloudfront:DeleteResponseHeadersPolicy
+                  - cloudfront:CreateDistribution
+                  - cloudfront:GetDistribution
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  - cloudfront:ListTagsForResource
+                  - cloudfront:CreateOriginAccessControl
+                  - cloudfront:GetOriginAccessControl
+                  - cloudfront:UpdateOriginAccessControl
+                  - cloudfront:DeleteOriginAccessControl
+                  - cloudfront:ListOriginAccessControls
+                Resource: '*'
+              
+              # Cognito permissions (both Identity Provider and Identity)
+              - Effect: Allow
+                Action:
+                  - cognito-idp:*
+                  - cognito-identity:*
+                Resource: '*'
+              
+              # ElastiCache permissions
+              - Effect: Allow
+                Action:
+                  - elasticache:*
+                Resource: '*'
+              
+              # RDS permissions
+              - Effect: Allow
+                Action:
+                  - rds:*
+                Resource: '*'
+              
+              # AWS Backup permissions
+              - Effect: Allow
+                Action:
+                  - backup:*
+                  - backup-storage:*
+                Resource: '*'
+              
+              # SNS permissions
+              - Effect: Allow
+                Action:
+                  - sns:*
+                Resource: '*'
+              
+              # OpenSearch permissions
+              - Effect: Allow
+                Action:
+                  - es:*
+                  - opensearch:*
+                Resource: '*'
+              
+              # Bedrock permissions
+              - Effect: Allow
+                Action:
+                  - bedrock:*
+                Resource: '*'
+              
+              # Service-linked roles
+              - Effect: Allow
+                Action:
+                  - iam:CreateServiceLinkedRole
+                  - iam:DeleteServiceLinkedRole
+                  - iam:GetServiceLinkedRoleDeletionStatus
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'iam:AWSServiceName': 
+                      - eks.amazonaws.com
+                      - eks-nodegroup.amazonaws.com
+                      - autoscaling.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+                      - backup.amazonaws.com
+                      - rds.amazonaws.com
+                      - elasticache.amazonaws.com
+                      - opensearch.amazonaws.com
+      Tags:
+        - Key: Name
+          Value: !Ref RoleName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Project
+          Value: "Agentic Platform Sample"
+        - Key: Purpose
+          Value: "CICD infrastructure deployment"
+
+Outputs:
+  CICDRoleArn:
+    Description: ARN of the CICD role
+    Value: !GetAtt CICDRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-CICDRole-Arn"
+  
+  CICDRoleName:
+    Description: Name of the CICD role
+    Value: !Ref CICDRole
+    Export:
+      Name: !Sub "${AWS::StackName}-CICDRole-Name"

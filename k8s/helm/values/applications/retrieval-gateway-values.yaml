@@ -24,7 +24,7 @@ fullnameOverride: "retrieval-gateway"
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8000
+  targetPort: 8080 # had to change port value from 8000 to 8080 to match Dockerfile
 
 env:
   - name: PYTHONPATH
@@ -48,6 +48,10 @@ serviceAccount:
   name: "retrieval-gateway-sa"
   create: true
   irsaRoleName: "retrieval-gateway-role"  # Role name without prefix
+  irsaConfigKey: RETRIEVAL_GATEWAY_ROLE_ARN
 
-# Memory gateway role
-irsaConfigKey: RETRIEVAL_GATEWAY_ROLE_ARN
+
+
+# Agent secret configuration for external secrets
+agentSecret:
+  configKey: "AGENT_LITELLM_SECRET_ARN"

@@ -24,7 +24,7 @@ fullnameOverride: "memory-gateway"
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8000
+  targetPort: 8080 # had to change port value from 8000 to 8080 to match Dockerfile
 
 env:
   - name: PYTHONPATH
@@ -53,3 +53,8 @@ serviceAccount:
 # Provider: bedrock_agentcore or postgres
 configDefaults:
   MEMORY_PROVIDER: "bedrock_agentcore"
+
+
+# Agent secret configuration for external secrets
+agentSecret:
+  configKey: "AGENT_LITELLM_SECRET_ARN"

@@ -13,7 +13,7 @@ resource "aws_iam_policy" "memory_gateway_postgres_policy" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = var.postgres_secret_arns
+        Resource = concat(var.postgres_secret_arns, var.litellm_secret_arns, var.agent_secret_arns)
       },
       # Allow RDS IAM authentication (if using IAM auth instead of password)
       {

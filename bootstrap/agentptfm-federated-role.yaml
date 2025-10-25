@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Creates the EKS admin role for Agentic Platform'
+
+Parameters:
+  RoleName:
+    Type: String
+    Default: "AgenticPlatformEKSAdminRole"
+    Description: Name of the EKS admin role
+    
+  Environment:
+    Type: String
+    Default: "dev"
+    Description: Environment name
+    
+  StackName:
+    Type: String
+    Default: "agentic-platform"
+    Description: Name prefix for all resources
+
+Resources:
+  EKSAdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Ref RoleName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Project
+          Value: "Agentic Platform Sample"
+        - Key: Purpose
+          Value: "EKS cluster admin role for KMS access"
+
+Outputs:
+  EKSAdminRoleArn:
+    Description: ARN of the EKS admin role
+    Value: !GetAtt EKSAdminRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-EKSAdminRole-Arn"
+  
+  EKSAdminRoleName:
+    Description: Name of the EKS admin role
+    Value: !Ref EKSAdminRole
+    Export:
+      Name: !Sub "${AWS::StackName}-EKSAdminRole-Name"

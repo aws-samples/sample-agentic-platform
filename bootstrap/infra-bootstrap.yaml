@@ -587,6 +587,11 @@ Resources:
                   enable_kms_encryption = false
                   kms_key_arn          = null
                   kms_key_id           = null
+
+                  # EKS Config
+                  enable_eks_public_access    = true
+                  deploy_inside_vpc           = false
+                  # additional_admin_role_arns = ["<ARN for your AgenticPlatformCICDRole>","<YOUR_IAM_PRINCIPAL_ARN"]
                   
                   # Networking Variables (from CloudFormation VPC)
                   vpc_id             = "${VPC_ID}"
@@ -608,12 +613,14 @@ Resources:
               commands:
                 - echo "Creating Terraform plan..."
                 - terraform plan -out=tfplan -input=false
-                
+
                 - echo "Applying Terraform plan..."
                 - terraform apply -auto-approve tfplan
-                
+
                 - echo "Deployment completed. Outputs:"
                 - terraform output -json | jq
+
+          
 
   ProjectKMSKey:
     Condition: UseKMSEncryption

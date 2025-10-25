@@ -16,6 +16,6 @@ resource "aws_secretsmanager_secret_version" "agent_secret" {
   secret_id     = aws_secretsmanager_secret.agent_secret.id
   secret_string = jsonencode({
     # LiteLLM master key
-    LITELLM_KEY = "PLACEHOLDER"
+    LITELLM_KEY = "sk-${random_string.litellm_master_key_suffix.result}"
   })
 }

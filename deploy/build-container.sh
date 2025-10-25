@@ -1,20 +1,28 @@
 #!/bin/bash
 
-# Check if container type is provided
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <service-name>"
+# Echo how the script was called
+echo "Called: $0 $*"
+
+# Check if service name and type are provided
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <service-name> <type>"
     echo "Available services are directories in the docker/ folder"
+    echo "Available types: service | agent"
     exit 1
 fi
 
 SERVICE_NAME="$1"
+TYPE="$2"
+
+# Convert hyphens to underscores for folder paths (repo uses underscores, Helm uses hyphens)
+FOLDER_NAME="${SERVICE_NAME//-/_}"
 
 # Move to project root
 cd "$(dirname "$0")/.."
 
 # Check for Dockerfile in src directory structure first, then fall back to docker directory
-SRC_DOCKERFILE_PATH="src/agentic_platform/agent/${SERVICE_NAME}/Dockerfile"
-DOCKER_DIR="docker/${SERVICE_NAME}"
+SRC_DOCKERFILE_PATH="src/agentic_platform/${TYPE}/${FOLDER_NAME}/Dockerfile"
+DOCKER_DIR="docker/${FOLDER_NAME}"
 DOCKER_DOCKERFILE_PATH="${DOCKER_DIR}/Dockerfile"
 
 if [[ -f "$SRC_DOCKERFILE_PATH" ]]; then
@@ -101,18 +109,9 @@ else
     echo "Repository $ECR_REPO_NAME already exists"
 fi
 
-# Build Docker image
-echo "Building Docker image..."
-docker buildx build --platform linux/amd64,linux/arm64 -t "$ECR_REPO_URI:$IMAGE_TAG" -f "$DOCKERFILE_PATH" .
-
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to build Docker image"
-    exit 1
-fi
-
-# Push to ECR
-echo "Pushing to ECR..."
-docker push "$ECR_REPO_URI:$IMAGE_TAG"
+# Build and push Docker image
+echo "Building and pushing Docker image..."
+docker buildx build --platform linux/amd64,linux/arm64 -t "$ECR_REPO_URI:$IMAGE_TAG" -f "$DOCKERFILE_PATH" --push .
 
 if [ $? -ne 0 ]; then
     echo "Error: Failed to push to ECR"
