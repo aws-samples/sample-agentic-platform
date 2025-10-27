@@ -151,3 +151,20 @@ output "cluster_oidc_provider_arn" {
   description = "The ARN of the OIDC Identity Provider for the EKS cluster"
   value       = aws_iam_openid_connect_provider.eks.arn
 }
+
+########################################################
+# Access Entries Outputs
+########################################################
+
+output "access_entries_ready" {
+  description = "Indicates when all access entries and policies are ready"
+  value = "ready"
+  depends_on = [
+    aws_eks_access_entry.cluster_admin,
+    aws_eks_access_policy_association.cluster_admin_policy,
+    aws_eks_access_entry.additional_admins,
+    aws_eks_access_policy_association.additional_admins_policy,
+    aws_eks_access_entry.bastion_hosts,
+    aws_eks_access_policy_association.bastion_hosts_policy
+  ]
+}

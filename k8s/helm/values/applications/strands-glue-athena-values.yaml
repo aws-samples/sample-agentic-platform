@@ -59,8 +59,8 @@ agentSecret:
 # Default values if keys aren't found in central config
 configDefaults:
   LITELLM_API_ENDPOINT: "http://litellm.default.svc.cluster.local:80"
-  RETRIEVAL_GATEWAY_ENDPOINT: "http://retrieval-gateway.default.svc.cluster.local:80"
-  MEMORY_GATEWAY_ENDPOINT: "http://memory-gateway.default.svc.cluster.local:80"
+  RETRIEVAL_GATEWAY_ENDPOINT: "http://retrieval-gateway.default.svc.cluster.local:80/api/retrieval-gateway"
+  MEMORY_GATEWAY_ENDPOINT: "http://memory-gateway.default.svc.cluster.local:80/api/memory-gateway"
 
 # AWS IAM permissions required for this agent
 iamPolicy:

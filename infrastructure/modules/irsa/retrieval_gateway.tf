@@ -75,3 +75,30 @@ resource "aws_iam_role_policy_attachment" "bedrock_retrieval_attachment" {
   policy_arn = aws_iam_policy.bedrock_retrieval_policy.arn
   role       = aws_iam_role.retrieval_gateway_role.name
 }
+
+# Policy to allow access to LiteLLM secret
+resource "aws_iam_policy" "retrieval_gateway_secrets_policy" {
+  name        = "${var.name_prefix}retrieval-gateway-secrets-policy"
+  description = "Policy to allow Retrieval Gateway to access secrets"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = concat(var.litellm_secret_arns, var.agent_secret_arns)
+      }
+    ]
+  })
+
+  tags = var.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "retrieval_gateway_secrets_attachment" {
+  policy_arn = aws_iam_policy.retrieval_gateway_secrets_policy.arn
+  role       = aws_iam_role.retrieval_gateway_role.name
+}
