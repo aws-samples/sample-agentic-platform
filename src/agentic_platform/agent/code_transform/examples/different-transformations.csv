@@ -1,0 +1,10 @@
+# Example: Different Transformations for Different Folders
+# Use case: Applying different ATX transformations to different code folders
+# This demonstrates using multiple transformation types in a single batch
+
+s3_path,build_command,transformation_name,output_s3_path
+s3://source/customer1/legacy-code/,noop,Comprehensive-Codebase-Analysis,s3://results/customer1/legacy-code/analysis/
+s3://source/customer1/migration-target/,noop,Code-Modernization,s3://results/customer1/migration-target/modernization/
+s3://source/customer2/security-audit/,noop,Security-Analysis,s3://results/customer2/security-audit/security/
+s3://source/customer2/performance-review/,noop,Performance-Analysis,s3://results/customer2/performance-review/performance/
+s3://source/customer3/documentation/,noop,Documentation-Generation,s3://results/customer3/documentation/docs/
