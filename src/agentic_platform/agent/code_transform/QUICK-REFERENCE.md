@@ -110,7 +110,7 @@ atx-container-test-runner/
 ├── .gitlab-ci.yml              ← Main deployment pipeline
 ├── .gitlab-ci-setup.yml        ← Setup pipeline
 ├── setup-gitlab-ci.sh          ← Local setup script
-├── CUSTOMER-README.md          ← Start here
+├── USER-GUIDE.md          ← Start here
 ├── SETUP-PIPELINE-GUIDE.md     ← Pipeline setup guide
 ├── QUICK-REFERENCE.md          ← This file
 ├── Dockerfile                  ← Container definition

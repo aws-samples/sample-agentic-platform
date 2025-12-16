@@ -39,7 +39,7 @@ This project provides a complete infrastructure-as-code solution for deploying A
 ## 🚀 Quick Start
 
 ### For Customers (Recommended)
-See **[CUSTOMER-README.md](CUSTOMER-README.md)** for the complete customer deployment guide.
+See **[USER-GUIDE.md](USER-GUIDE.md)** for the complete customer deployment guide.
 
 ### For Developers
 1. **Clone the repository**
@@ -66,7 +66,7 @@ See **[CUSTOMER-README.md](CUSTOMER-README.md)** for the complete customer deplo
 
 | Document | Purpose |
 |----------|---------|
-| **[CUSTOMER-README.md](CUSTOMER-README.md)** | 👥 Complete customer deployment guide |
+| **[USER-GUIDE.md](USER-GUIDE.md)** | 👥 Complete user deployment guide |
 | **[GITLAB-DEPLOYMENT.md](GITLAB-DEPLOYMENT.md)** | 🔄 GitLab CI/CD setup and troubleshooting |
 | **[QUICKSTART-ECS.md](QUICKSTART-ECS.md)** | ⚡ Quick ECS deployment guide |
 | **[OIDC-SETUP-GUIDE.md](OIDC-SETUP-GUIDE.md)** | 🔐 OIDC authentication setup |
@@ -102,7 +102,7 @@ See **[CUSTOMER-README.md](CUSTOMER-README.md)** for the complete customer deplo
 
 ```
 atx-container-test-runner/
-├── 📄 CUSTOMER-README.md           # Customer deployment guide
+├── 📄 USER-GUIDE.md           # Customer deployment guide
 ├── 📄 GITLAB-DEPLOYMENT.md         # GitLab CI/CD setup guide  
 ├── 📄 QUICKSTART-ECS.md            # Quick ECS deployment
 ├── 📄 OIDC-SETUP-GUIDE.md          # OIDC authentication setup
@@ -217,7 +217,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🎉 Getting Started
 
-Ready to deploy? Start with **[CUSTOMER-README.md](CUSTOMER-README.md)** for the complete setup guide!
+Ready to deploy? Start with **[USER-GUIDE.md](USER-GUIDE.md)** for the complete setup guide!
 
 ---
 

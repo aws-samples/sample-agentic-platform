@@ -6,7 +6,7 @@ Essential Files:
 - Dockerfile                                    Container definition
 - .gitlab-ci.yml                                GitLab CI/CD pipeline (OIDC)
 - setup-gitlab-ci.sh                            OIDC setup script
-- CUSTOMER-README.md                            Customer getting started guide
+- USER-GUIDE.md                            Customer getting started guide
 - QUICK-REFERENCE.md                            Quick reference card
 - OIDC-SETUP-GUIDE.md                           OIDC authentication guide
 - GITLAB-DEPLOYMENT.md                          GitLab deployment guide

@@ -6,7 +6,7 @@ Welcome! This package contains everything you need to deploy the ATX Container T
 
 ```
 atx-container-test-runner/
-├── CUSTOMER-README.md              ← Start here!
+├── USER-GUIDE.md              ← Start here!
 ├── README.md                       ← Project overview
 ├── GITLAB-DEPLOYMENT.md            ← Complete GitLab setup guide
 ├── QUICKSTART-ECS.md               ← Quick start for ECS deployment
