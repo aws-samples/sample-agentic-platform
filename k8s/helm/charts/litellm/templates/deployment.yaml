@@ -18,6 +18,49 @@ spec:
         timestamp: "{{ now | unixEpoch }}"
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      initContainers:
+        - name: db-init
+          image: postgres:16-alpine
+          envFrom:
+            - secretRef:
+                name: litellm-secret
+            - configMapRef:
+                name: agentic-platform-config
+          env:
+            - name: PGHOST
+              value: "$(PG_WRITER_ENDPOINT)"
+            - name: PGPORT
+              value: "$(PG_PORT)"
+            - name: PGUSER
+              value: "postgres"
+            - name: PGDATABASE
+              value: "postgres"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-master-secret
+                  key: password
+          command:
+            - sh
+            - -c
+            - |
+              echo 'Setting up LiteLLM database...'
+              
+              # Create database if it doesn't exist
+              psql -c "CREATE DATABASE litellm_db;" || echo 'Database already exists'
+              
+              # Create user if it doesn't exist
+              psql -c "CREATE USER litellm WITH PASSWORD '$POSTGRES_PASSWORD';" || echo 'User already exists'
+              
+              # Grant permissions
+              psql -c "GRANT ALL PRIVILEGES ON DATABASE litellm_db TO litellm;"
+              psql -d litellm_db -c "GRANT ALL ON SCHEMA public TO litellm;"
+              psql -d litellm_db -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO litellm;"
+              psql -d litellm_db -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO litellm;"
+              psql -d litellm_db -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO litellm;"
+              psql -d litellm_db -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO litellm;"
+              
+              echo 'Database setup complete'
       containers:
         - name: {{ .Chart.Name }}
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}

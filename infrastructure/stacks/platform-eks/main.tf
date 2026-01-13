@@ -239,7 +239,7 @@ module "irsa" {
   secrets_manager_arns   = [module.cognito.m2m_credentials_secret_arn]
   
   # LiteLLM specific ARNs
-  litellm_secret_arns           = [module.litellm.litellm_secret_arn]
+  litellm_secret_arns           = [module.litellm.litellm_secret_arn, module.postgres_aurora.master_user_secret_arn]
   litellm_postgres_db_user_arns = [module.litellm.postgres_db_user_arn]
   
   # Agent specific ARNs
