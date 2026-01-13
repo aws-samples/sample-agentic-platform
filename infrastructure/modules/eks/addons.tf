@@ -1,9 +1,9 @@
 # EKS Addons - Required for node groups to join the cluster
 resource "aws_eks_addon" "vpc_cni" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "vpc-cni"
+  cluster_name    = aws_eks_cluster.main.name
+  addon_name      = "vpc-cni"
+  addon_version   = "v1.21.1-eksbuild.1"  # Latest for EKS 1.34
   
-  # Use the latest available version
   resolve_conflicts_on_update = "OVERWRITE"
   
   depends_on = [
@@ -12,10 +12,10 @@ resource "aws_eks_addon" "vpc_cni" {
 }
 
 resource "aws_eks_addon" "coredns" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "coredns"
+  cluster_name    = aws_eks_cluster.main.name
+  addon_name      = "coredns"
+  addon_version   = "v1.12.4-eksbuild.1"  # Latest for EKS 1.34
   
-  # Use the latest available version
   resolve_conflicts_on_update = "OVERWRITE"
   
   # CoreDNS requires nodes to be available
@@ -26,10 +26,10 @@ resource "aws_eks_addon" "coredns" {
 }
 
 resource "aws_eks_addon" "kube_proxy" {
-  cluster_name = aws_eks_cluster.main.name
-  addon_name   = "kube-proxy"
+  cluster_name    = aws_eks_cluster.main.name
+  addon_name      = "kube-proxy"
+  addon_version   = "v1.34.0-eksbuild.2"  # Default for EKS 1.34
   
-  # Use the latest available version
   resolve_conflicts_on_update = "OVERWRITE"
   
   depends_on = [
@@ -41,7 +41,7 @@ resource "aws_eks_addon" "kube_proxy" {
 resource "aws_eks_addon" "cert_manager" {
   cluster_name      = aws_eks_cluster.main.name
   addon_name        = "cert-manager"
-  addon_version     = "v1.17.2-eksbuild.1"  # Use the latest version available at the time
+  addon_version     = "v1.17.2-eksbuild.1"  # Compatible with EKS 1.34
   
   resolve_conflicts_on_update = "OVERWRITE"
   
@@ -57,7 +57,7 @@ resource "aws_eks_addon" "cert_manager" {
 resource "aws_eks_addon" "adot" {
   cluster_name      = aws_eks_cluster.main.name
   addon_name        = "adot"
-  addon_version     = "v0.117.0-eksbuild.1"  # Specific version requested
+  addon_version     = "v0.141.0-eksbuild.1"  # Default for EKS 1.34
   
   # Use PRESERVE to maintain any custom configurations
   resolve_conflicts_on_update = "PRESERVE"

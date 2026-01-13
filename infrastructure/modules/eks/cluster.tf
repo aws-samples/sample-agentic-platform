@@ -13,7 +13,7 @@ resource "aws_eks_cluster" "main" {
   # checkov:skip=CKV_AWS_339: This is the latest up to date version of EKS with ADOT support.
   name     = "${var.name_prefix}eks"
   role_arn = aws_iam_role.eks_cluster_role.arn
-  version  = "1.32"
+  version  = "1.34"
 
   vpc_config {
     subnet_ids              = var.private_subnet_ids
