@@ -2,6 +2,17 @@ model_list:
   - model_name: anthropic.claude-sonnet-4-20250514-v1:0
     litellm_params:
       model: bedrock/converse/us.anthropic.claude-sonnet-4-20250514-v1:0
+      api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
+
+  - model_name: anthropic.claude-sonnet-4-5-20250929-v1:0
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-sonnet-4-5-20250929-v1:0
+      api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
+  
+  - model_name: anthropic.claude-haiku-4-5-20251001-v1:0
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-haiku-4-5-20251001-v1:0
+      api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
 
   - model_name: us.anthropic.claude-3-5-sonnet-20241022-v2:0
     litellm_params:

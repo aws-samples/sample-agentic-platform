@@ -12,6 +12,7 @@
 .PHONY: pydanticai-agent
 .PHONY: agentic_chat
 .PHONY: agentic-rag
+.PHONY: jira-agent
 # Makefile for running servers locally with UV and the correct environment variables.
 # Make sure to fill in your .env file with the correct values.
 
@@ -63,6 +64,10 @@ memory-gateway:
 agentic-rag:
 	cd src && \
 	uv run --env-file agentic_platform/agent/agentic_rag/.env -- uvicorn agentic_platform.agent.agentic_rag.server:app --reload --port 8004
+
+jira-agent:
+	cd src && \
+	uv run --env-file agentic_platform/agent/jira_agent/.env -- uvicorn agentic_platform.agent.jira_agent.server:app --reload --port 8080
 
 retrieval-gateway:
 	cd src && \

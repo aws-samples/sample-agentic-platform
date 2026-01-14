@@ -23,7 +23,7 @@ spec:
           image: "{{ include "app.image" . }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: {{ .Values.service.targetPort | default 8000 }}
+            - containerPort: {{ .Values.service.targetPort | default 8080 }}
           envFrom:
             - secretRef:
                 name: {{ include "app.name" . }}-agent-secret
@@ -38,13 +38,13 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.service.targetPort | default 8000 }}
+              port: {{ .Values.service.targetPort | default 8080 }}
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
-              port: {{ .Values.service.targetPort | default 8000 }}
+              port: {{ .Values.service.targetPort | default 8080 }}
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:

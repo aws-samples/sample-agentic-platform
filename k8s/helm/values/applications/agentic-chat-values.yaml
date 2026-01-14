@@ -19,7 +19,7 @@ fullnameOverride: "agentic-chat"
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8000
+  targetPort: 8080
 
 env:
   - name: PYTHONPATH
