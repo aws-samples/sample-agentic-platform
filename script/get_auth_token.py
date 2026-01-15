@@ -5,27 +5,34 @@ import json
 import argparse
 import sys
 
-def get_token(client_id=None, username=None, password=None):
-    """Get Cognito access token using provided or environment credentials"""
-    # Use provided values or get from environment
-    client_id = client_id or os.environ.get("COGNITO_CLIENT_ID")
-    username = username or os.environ.get("COGNITO_USERNAME") 
-    password = password or os.environ.get("COGNITO_PASSWORD")
+def get_config_from_ssm(environment="dev", region=None):
+    """Fetch configuration from SSM Parameter Store"""
+    ssm = boto3.client('ssm', region_name=region)
+    param_name = f"/agentic-platform/config/{environment}"
     
-    # Check if we have all required values
-    if not all([client_id, username, password]):
-        missing = []
-        if not client_id: missing.append("COGNITO_CLIENT_ID")
-        if not username: missing.append("COGNITO_USERNAME")
-        if not password: missing.append("COGNITO_PASSWORD")
-        
-        print(f"Error: Missing required credentials: {', '.join(missing)}")
-        print("Please provide them as arguments or environment variables.")
+    try:
+        response = ssm.get_parameter(Name=param_name, WithDecryption=True)
+        return json.loads(response['Parameter']['Value'])
+    except Exception as e:
+        print(f"Error fetching config from SSM: {e}")
+        sys.exit(1)
+
+def get_token(username=None, password=None, environment="dev", region=None):
+    """Get Cognito access token using provided or SSM credentials"""
+    config = get_config_from_ssm(environment, region)
+    
+    client_id = config.get('COGNITO_USER_CLIENT_ID')
+    if not client_id:
+        print("Error: COGNITO_USER_CLIENT_ID not found in SSM config")
+        sys.exit(1)
+    
+    if not username or not password:
+        print("Error: Username and password are required")
         sys.exit(1)
     
     try:
         # Create Cognito client
-        client = boto3.client('cognito-idp')
+        client = boto3.client('cognito-idp', region_name=region)
         
         # Authenticate with username and password
         response = client.initiate_auth(
@@ -58,15 +65,16 @@ def get_token(client_id=None, username=None, password=None):
 if __name__ == "__main__":
     # Add command line arguments
     parser = argparse.ArgumentParser(description='Get Cognito access token')
-    parser.add_argument('--client-id', help='Cognito client ID')
-    parser.add_argument('--username', help='Cognito username')
-    parser.add_argument('--password', help='Cognito password')
+    parser.add_argument('--username', required=True, help='Cognito username')
+    parser.add_argument('--password', required=True, help='Cognito password')
+    parser.add_argument('--environment', default='dev', help='Environment (default: dev)')
+    parser.add_argument('--region', help='AWS region')
     parser.add_argument('--quiet', action='store_true', help='Only output the token')
     
     args = parser.parse_args()
     
     # Get token
-    token = get_token(args.client_id, args.username, args.password)
+    token = get_token(args.username, args.password, args.environment, args.region)
     
     # If quiet mode, just print the token
     if args.quiet:

@@ -27,7 +27,7 @@ class StrandsJiraAgent:
 
         # To use the LiteLLM proxy, use the OpenAIModel to avoid name conflicts
         self.model = OpenAIModel(
-            model_id="anthropic.claude-sonnet-4-20250514-v1:0",
+            model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
             client_args={
                 "api_key": litellm_info.api_key,
                 "base_url": litellm_info.api_endpoint,
