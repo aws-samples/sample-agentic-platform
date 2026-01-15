@@ -76,6 +76,7 @@ resource "aws_cloudfront_distribution" "spa_website" {
       target_origin_id = "VPC-0"  # Use first VPC origin
 
       cache_policy_id            = data.aws_cloudfront_cache_policy.managed_caching_disabled.id
+      origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.managed_all_viewer.id
       response_headers_policy_id = data.aws_cloudfront_response_headers_policy.managed_cors_with_preflight.id
 
       viewer_protocol_policy = "redirect-to-https"

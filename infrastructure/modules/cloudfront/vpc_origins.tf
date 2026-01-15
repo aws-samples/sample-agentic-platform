@@ -6,7 +6,7 @@ resource "aws_cloudfront_vpc_origin" "alb" {
   count = length(var.vpc_origin_arns)
 
   vpc_origin_endpoint_config {
-    name                   = "vpc-origin-${count.index}"
+    name                   = "agntptfm-alb-${count.index}"
     arn                    = var.vpc_origin_arns[count.index]
     http_port              = 80
     https_port             = 443

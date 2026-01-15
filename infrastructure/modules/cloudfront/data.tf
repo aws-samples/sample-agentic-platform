@@ -17,3 +17,7 @@ data "aws_cloudfront_origin_request_policy" "managed_cors_s3_origin" {
 data "aws_cloudfront_response_headers_policy" "managed_cors_with_preflight" {
   id = "5cc3b908-e619-4b99-88e5-2cf7f45965bd"
 }
+
+data "aws_cloudfront_origin_request_policy" "managed_all_viewer" {
+  name = "Managed-AllViewer"
+}

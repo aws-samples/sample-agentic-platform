@@ -228,3 +228,19 @@ variable "s3_force_destroy" {
   type        = bool
   default     = true
 }
+
+########################################################
+# ALB VPC Origin Configuration (Optional)
+########################################################
+
+variable "alb_arn" {
+  description = "ARN of the Application Load Balancer for CloudFront VPC origin. If null, VPC origin will be skipped."
+  type        = string
+  default     = null
+}
+
+variable "alb_dns_name" {
+  description = "DNS name of the Application Load Balancer for CloudFront VPC origin"
+  type        = string
+  default     = ""
+}

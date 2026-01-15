@@ -353,6 +353,10 @@ module "cloudfront_spa" {
   # S3 bucket configuration
   s3_bucket_name                  = module.s3_spa_website.bucket_name
   s3_bucket_regional_domain_name  = module.s3_spa_website.bucket_regional_domain_name
+
+  # VPC origin configuration (conditional)
+  vpc_origin_arns        = var.alb_arn != null ? [var.alb_arn] : []
+  load_balancer_dns_name = var.alb_dns_name
 }
 
 ########################################################
