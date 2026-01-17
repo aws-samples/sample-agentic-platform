@@ -1,0 +1,83 @@
+# Default values for mcp-server
+# This is a YAML-formatted file.
+
+# Namespace configuration
+namespace: "default"
+
+# Replica count
+replicaCount: 1
+
+# Container image
+image:
+  repository: ""
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Environment variables
+env:
+  - name: PYTHONPATH
+    value: /app
+
+# Resource allocation
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+# Ingress configuration for HTTP-based MCP servers
+ingress:
+  enabled: true
+  path: ""
+
+# Service account configuration
+serviceAccount:
+  name: ""
+  create: true
+  # Which IRSA role to use - options:
+  # - RETRIEVAL_GATEWAY_ROLE_ARN (bedrock KB access)
+  # - INTEGRATION_LAYER_ROLE_ARN (external APIs)
+  # - DATA_LAYER_ROLE_ARN (RDS, S3, etc.)
+  # - AGENT_ROLE_ARN (basic permissions)
+  irsaConfigKey: "AGENT_ROLE_ARN"
+
+# Default IRSA role
+irsaConfigKey: "AGENT_ROLE_ARN"
+
+# Agent secret configuration
+agentSecret:
+  arn: ""
+  configKey: "AGENT_LITELLM_SECRET_ARN"
+
+# Additional ConfigMaps to load (optional)
+# List of ConfigMap names to include in envFrom
+# Example: ["knowledge-layer-config", "integration-layer-config"]
+additionalConfigMaps: []
+
+# Default config values (always available)
+configDefaults:
+  LLM_GATEWAY_ENDPOINT: "http://llm-gateway.default.svc.cluster.local:80"
+  RETRIEVAL_GATEWAY_ENDPOINT: "http://retrieval-gateway.default.svc.cluster.local:80"
+  MEMORY_GATEWAY_ENDPOINT: "http://memory-gateway.default.svc.cluster.local:80"
+
+# MCP-specific configuration
+mcp:
+  # Protocol type: http or stdio
+  protocol: "http"
+
+  # Health check configuration (for HTTP-based MCP servers)
+  healthCheck:
+    enabled: true
+    path: "/health"
+    initialDelaySeconds: 30
+    periodSeconds: 10

@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mcp.name" . }}
+  namespace: {{ include "mcp.namespace" . }}
+  labels:
+    app: {{ include "mcp.name" . }}
+    component: mcp-server
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "mcp.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "mcp.name" . }}
+        component: mcp-server
+      annotations:
+        timestamp: "{{ now | unixEpoch }}"
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ include "mcp.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort | default 8080 }}
+          envFrom:
+            # Service-specific secret (LiteLLM key, etc.)
+            - secretRef:
+                name: {{ include "mcp.name" . }}-agent-secret
+            # Service-specific config (defaults from values.yaml)
+            - configMapRef:
+                name: {{ include "mcp.name" . }}-config
+            # Platform config (always available)
+            - configMapRef:
+                name: agentic-platform-config
+            # Additional ConfigMaps (if specified)
+            {{- range .Values.additionalConfigMaps }}
+            - configMapRef:
+                name: {{ . }}
+                optional: true
+            {{- end }}
+          env:
+            {{- range .Values.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          {{- if .Values.mcp.healthCheck.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.mcp.healthCheck.path }}
+              port: {{ .Values.service.targetPort | default 8080 }}
+            initialDelaySeconds: {{ .Values.mcp.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.mcp.healthCheck.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.mcp.healthCheck.path }}
+              port: {{ .Values.service.targetPort | default 8080 }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

@@ -5,18 +5,35 @@ A modular repository demonstrating how to build an agentic platform including la
 This sample is active
 
 # Architecture
-## High Level Architecture
+
+This repository provides **two deployment architectures** to suit different operational preferences:
+
+## 1. EKS-Based Architecture (Full Control)
 ![High Level Architecture](media/highlevel-architecture.png)
 
-The sample platform is built on EKS and uses a variety of AWS services to deploy 10+ agentic systems demonstrating how everything works together. It's instrumented with telemetry and demonstrates operational considerations when deploying agents. Code is written in an abstracted/modular way to make it easy to switch the underlying infrastructure components to suit your needs.
+The EKS deployment gives you complete control over the infrastructure. The platform is built on EKS and uses a variety of AWS services to deploy 10+ agentic systems demonstrating how everything works together. It's instrumented with telemetry and demonstrates operational considerations when deploying agents. Code is written in an abstracted/modular way to make it easy to switch the underlying infrastructure components to suit your needs.
 
-## Agent Process Architecture
+### Agent Process Architecture
 ![Agent Process Architecture](media/agent-design.png)
+
 Each agent runs as a FastAPI server sharing a core package which contains types and client abstractions (like LLM API provider). APIs are authenticated using Cognito through a middleware layer that's simple to swap out for your own IDP. 
 
 The agents themselves do not have IAM roles attached to them. Instead they connect to AWS resources through microservices like the LLM Gateway, Memory Gateway, and Retrieval Gateway (which do have IAM roles through IRSA). Those requests are authenticated by passing JWT tokens between each request. Each pod running in EKS is authenticated using oAuth regardless of whether the request was service <> service or user <> service by validating tokens against the IDP's public cert.
 
-Lastly, telemetry information is collected using open telemetry collectors and pushed to X-Ray for traces, Cloudwatch for metrics, and OpenSearch for logs. An agent uses the observability facade (in the common package) which is pre-configured to send to our open telemetry endpoints. The OTEL collectors then push the telemetry data to any endpoint that supports open telemetry protocol (OTLP). This makes it easy to switch vendors or different services. Anything that supports OTLP will work.
+Telemetry information is collected using open telemetry collectors and pushed to X-Ray for traces, CloudWatch for metrics, and OpenSearch for logs. An agent uses the observability facade (in the common package) which is pre-configured to send to our open telemetry endpoints. The OTEL collectors then push the telemetry data to any endpoint that supports open telemetry protocol (OTLP). This makes it easy to switch vendors or different services. Anything that supports OTLP will work.
+
+## 2. AgentCore Architecture (Managed Service)
+![AgentCore Architecture](media/agentcore-arch.png)
+
+For those who prefer a more managed approach, we provide a separate deployment stack that leverages **Amazon Bedrock AgentCore** primitives. This architecture uses AWS-managed services to handle agent orchestration, reducing operational overhead while maintaining the same agent capabilities.
+
+AgentCore provides:
+- **Managed agent runtime**: No need to manage EKS clusters or container orchestration
+- **Built-in integrations**: Native connections to Bedrock models, Knowledge Bases, and AWS services
+- **Simplified deployment**: Deploy agents as Lambda functions or containers with minimal infrastructure
+- **Automatic scaling**: Serverless scaling based on demand
+
+Both architectures share the same core agent code and patterns, allowing you to choose the deployment model that best fits your operational requirements.
 
 # Getting Started
 

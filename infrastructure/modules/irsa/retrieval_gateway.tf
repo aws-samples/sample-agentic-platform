@@ -61,7 +61,10 @@ resource "aws_iam_role" "retrieval_gateway_role" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${replace(var.cluster_oidc_issuer_url, "https://", "")}:sub": "system:serviceaccount:default:retrieval-gateway-sa"
+            "${replace(var.cluster_oidc_issuer_url, "https://", "")}:sub": [
+              "system:serviceaccount:default:retrieval-gateway-sa",
+              "system:serviceaccount:default:bedrock-kb-mcp-server-sa"
+            ]
           }
         }
       }

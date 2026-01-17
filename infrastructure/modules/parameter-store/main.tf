@@ -59,6 +59,7 @@ locals {
 
 # Single parameter store with all configuration values in a flat structure
 resource "aws_ssm_parameter" "agentic_platform_config" {
+  #checkov:skip=CKV2_AWS_34:Parameter Store encryption is optional. KMS encryption can be enabled by changing type to SecureString and providing kms_key_id
   name        = var.parameter_name != null ? var.parameter_name : "${var.parameter_base_path}/${var.environment}"
   description = "All configuration values for the Agentic Platform"
   type        = "String"

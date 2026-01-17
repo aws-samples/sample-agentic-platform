@@ -1,0 +1,57 @@
+# Values for bedrock-kb-mcp-server using mcp-server chart
+namespace: "default"
+
+replicaCount: 1
+
+image:
+  repository: "agentic-platform-bedrock-kb-mcp-server"
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: "bedrock-kb-mcp-server"
+fullnameOverride: "bedrock-kb-mcp-server"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+env:
+  - name: PYTHONPATH
+    value: /app
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+ingress:
+  enabled: true
+  path: "/bedrock-kb-mcp-server"
+
+serviceAccount:
+  name: "bedrock-kb-mcp-server-sa"
+  create: true
+  irsaConfigKey: "RETRIEVAL_GATEWAY_ROLE_ARN"
+
+irsaConfigKey: "RETRIEVAL_GATEWAY_ROLE_ARN"
+
+agentSecret:
+  configKey: "AGENT_LITELLM_SECRET_ARN"
+
+# Configuration comes from knowledge-layer-config ConfigMap (created by Terraform)
+configDefaults: {}
+
+# Additional ConfigMaps to load (beyond the standard ones)
+additionalConfigMaps:
+  - knowledge-layer-config
+
+mcp:
+  protocol: "http"
+  healthCheck:
+    enabled: true
+    path: "/health"
+    initialDelaySeconds: 30
+    periodSeconds: 10
