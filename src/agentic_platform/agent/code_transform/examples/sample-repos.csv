@@ -1,0 +1,13 @@
+# QAD Sample CSV Configuration for ATX Container Test Runner
+# This file demonstrates the CSV format for specifying S3 folders to process
+#
+# Format: s3_path,build_command,transformation_name,output_s3_path
+# - s3_path: S3 URI to folder containing Progress code files
+# - build_command: Build command (typically 'noop' for Progress analysis)
+# - transformation_name: ATX transformation to apply
+# - output_s3_path: S3 URI where results should be uploaded
+#
+# Note: "folder" and "menu" are used interchangeably - both refer to directories containing code
+
+s3_path,build_command,transformation_name,output_s3_path
+s3://atx-test-source-438227048955/customer-abc/menu1/,noop,spuragu-progress-to-ir,s3://atx-test-results-438227048955/customer-abc/menu1/

@@ -1,0 +1,10 @@
+# Example: Single Customer with Multiple Folders
+# Use case: Processing all folders for a single customer
+# This example shows a typical scenario where one customer has multiple code folders
+
+s3_path,build_command,transformation_name,output_s3_path
+s3://my-source-bucket/acme-corp/accounting/,noop,Comprehensive-Codebase-Analysis,s3://my-results-bucket/acme-corp/accounting/
+s3://my-source-bucket/acme-corp/inventory/,noop,Comprehensive-Codebase-Analysis,s3://my-results-bucket/acme-corp/inventory/
+s3://my-source-bucket/acme-corp/sales/,noop,Comprehensive-Codebase-Analysis,s3://my-results-bucket/acme-corp/sales/
+s3://my-source-bucket/acme-corp/reporting/,noop,Comprehensive-Codebase-Analysis,s3://my-results-bucket/acme-corp/reporting/
+s3://my-source-bucket/acme-corp/utilities/,noop,Comprehensive-Codebase-Analysis,s3://my-results-bucket/acme-corp/utilities/

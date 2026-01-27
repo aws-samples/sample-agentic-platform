@@ -1,0 +1,280 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "CloudFormationAccess",
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:CreateStack",
+                "cloudformation:UpdateStack",
+                "cloudformation:DeleteStack",
+                "cloudformation:DescribeStacks",
+                "cloudformation:DescribeStackEvents",
+                "cloudformation:DescribeStackResources",
+                "cloudformation:ValidateTemplate",
+                "cloudformation:GetTemplate",
+                "cloudformation:ListStacks"
+            ],
+            "Resource": [
+                "arn:aws:cloudformation:*:*:stack/atx-test-runner/*",
+                "arn:aws:cloudformation:*:*:stack/atx-test-runner"
+            ]
+        },
+        {
+            "Sid": "CloudFormationTemplateValidation",
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:ValidateTemplate"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ECRAccess",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:InitiateLayerUpload",
+                "ecr:UploadLayerPart",
+                "ecr:CompleteLayerUpload",
+                "ecr:PutImage",
+                "ecr:CreateRepository",
+                "ecr:DescribeRepositories",
+                "ecr:DescribeImages",
+                "ecr:ListImages",
+                "ecr:TagResource"
+            ],
+            "Resource": [
+                "arn:aws:ecr:*:*:repository/atx-test-runner",
+                "arn:aws:ecr:*:*:repository/atx-test-runner/*"
+            ]
+        },
+        {
+            "Sid": "ECRAuthToken",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ECSAccess",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:CreateCluster",
+                "ecs:DescribeClusters",
+                "ecs:UpdateCluster",
+                "ecs:DeleteCluster",
+                "ecs:CreateService",
+                "ecs:DescribeServices",
+                "ecs:UpdateService",
+                "ecs:DeleteService",
+                "ecs:RegisterTaskDefinition",
+                "ecs:DescribeTaskDefinition",
+                "ecs:DeregisterTaskDefinition",
+                "ecs:RunTask",
+                "ecs:DescribeTasks",
+                "ecs:StopTask",
+                "ecs:ListTasks",
+                "ecs:TagResource",
+                "ecs:UntagResource"
+            ],
+            "Resource": [
+                "arn:aws:ecs:*:*:cluster/atx-test-runner-*",
+                "arn:aws:ecs:*:*:service/atx-test-runner-*/*",
+                "arn:aws:ecs:*:*:task-definition/atx-test-runner-*:*",
+                "arn:aws:ecs:*:*:task/atx-test-runner-*/*"
+            ]
+        },
+        {
+            "Sid": "EC2NetworkingAccess",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:CreateVpc",
+                "ec2:DeleteVpc",
+                "ec2:DescribeVpcs",
+                "ec2:ModifyVpcAttribute",
+                "ec2:CreateSubnet",
+                "ec2:DeleteSubnet",
+                "ec2:DescribeSubnets",
+                "ec2:ModifySubnetAttribute",
+                "ec2:CreateInternetGateway",
+                "ec2:DeleteInternetGateway",
+                "ec2:DescribeInternetGateways",
+                "ec2:AttachInternetGateway",
+                "ec2:DetachInternetGateway",
+                "ec2:CreateRouteTable",
+                "ec2:DeleteRouteTable",
+                "ec2:DescribeRouteTables",
+                "ec2:CreateRoute",
+                "ec2:DeleteRoute",
+                "ec2:AssociateRouteTable",
+                "ec2:DisassociateRouteTable",
+                "ec2:CreateSecurityGroup",
+                "ec2:DeleteSecurityGroup",
+                "ec2:DescribeSecurityGroups",
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:AuthorizeSecurityGroupEgress",
+                "ec2:RevokeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupEgress",
+                "ec2:CreateTags",
+                "ec2:DescribeTags",
+                "ec2:DescribeAvailabilityZones"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": ["us-east-1", "us-west-2", "eu-west-1"]
+                }
+            }
+        },
+        {
+            "Sid": "IAMRoleAccess",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:UpdateRole",
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy",
+                "iam:PutRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:GetRolePolicy",
+                "iam:ListRolePolicies",
+                "iam:ListAttachedRolePolicies",
+                "iam:PassRole",
+                "iam:TagRole",
+                "iam:UntagRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:role/atx-test-runner-*",
+                "arn:aws:iam::*:role/ecsTaskExecutionRole*",
+                "arn:aws:iam::*:role/ECS*"
+            ]
+        },
+        {
+            "Sid": "IAMPolicyAccess",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreatePolicy",
+                "iam:DeletePolicy",
+                "iam:GetPolicy",
+                "iam:GetPolicyVersion",
+                "iam:ListPolicyVersions"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:policy/atx-test-runner-*"
+            ]
+        },
+        {
+            "Sid": "CloudWatchLogsAccess",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:DeleteLogGroup",
+                "logs:DescribeLogGroups",
+                "logs:PutRetentionPolicy",
+                "logs:TagLogGroup",
+                "logs:UntagLogGroup",
+                "logs:CreateLogStream",
+                "logs:DescribeLogStreams",
+                "logs:PutLogEvents"
+            ],
+            "Resource": [
+                "arn:aws:logs:*:*:log-group:/ecs/atx-test-runner-*",
+                "arn:aws:logs:*:*:log-group:/ecs/atx-test-runner-*:*"
+            ]
+        },
+        {
+            "Sid": "S3BucketAccess",
+            "Effect": "Allow",
+            "Action": [
+                "s3:CreateBucket",
+                "s3:DeleteBucket",
+                "s3:GetBucketLocation",
+                "s3:GetBucketVersioning",
+                "s3:PutBucketVersioning",
+                "s3:GetBucketEncryption",
+                "s3:PutBucketEncryption",
+                "s3:GetBucketPublicAccessBlock",
+                "s3:PutBucketPublicAccessBlock",
+                "s3:GetBucketTagging",
+                "s3:PutBucketTagging",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::atx-test-*",
+                "arn:aws:s3:::*-atx-test-*"
+            ]
+        },
+        {
+            "Sid": "S3ObjectAccess",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:GetObjectVersion",
+                "s3:DeleteObjectVersion"
+            ],
+            "Resource": [
+                "arn:aws:s3:::atx-test-*/*",
+                "arn:aws:s3:::*-atx-test-*/*"
+            ]
+        },
+        {
+            "Sid": "ApplicationAutoScalingAccess",
+            "Effect": "Allow",
+            "Action": [
+                "application-autoscaling:RegisterScalableTarget",
+                "application-autoscaling:DeregisterScalableTarget",
+                "application-autoscaling:DescribeScalableTargets",
+                "application-autoscaling:PutScalingPolicy",
+                "application-autoscaling:DeleteScalingPolicy",
+                "application-autoscaling:DescribeScalingPolicies"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "application-autoscaling:service-namespace": "ecs"
+                }
+            }
+        },
+        {
+            "Sid": "LoadBalancerAccess",
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateLoadBalancer",
+                "elasticloadbalancing:DeleteLoadBalancer",
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:CreateTargetGroup",
+                "elasticloadbalancing:DeleteTargetGroup",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:CreateListener",
+                "elasticloadbalancing:DeleteListener",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:ModifyLoadBalancerAttributes",
+                "elasticloadbalancing:ModifyTargetGroupAttributes",
+                "elasticloadbalancing:AddTags",
+                "elasticloadbalancing:RemoveTags"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringLike": {
+                    "aws:RequestTag/Project": "atx-test-runner"
+                }
+            }
+        },
+        {
+            "Sid": "STSAccess",
+            "Effect": "Allow",
+            "Action": [
+                "sts:GetCallerIdentity"
+            ],
+            "Resource": "*"
+        }
+    ]
+}

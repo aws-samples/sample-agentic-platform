@@ -1,0 +1,151 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: atx-test-runner
+  labels:
+    app: atx-test-runner
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: atx-test-runner
+  namespace: atx-test-runner
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/atx-test-runner-role
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atx-test-runner-config
+  namespace: atx-test-runner
+data:
+  repos.csv: |
+    s3_path,build_command,transformation_name,output_s3_path
+    s3://source-bucket/customer1/folder1/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer1/folder1/
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: atx-test-runner-job
+  namespace: atx-test-runner
+  labels:
+    app: atx-test-runner
+    version: "0.1.0"
+spec:
+  backoffLimit: 3
+  completions: 1
+  parallelism: 1
+  ttlSecondsAfterFinished: 86400  # Clean up after 24 hours
+  template:
+    metadata:
+      labels:
+        app: atx-test-runner
+    spec:
+      serviceAccountName: atx-test-runner
+      restartPolicy: OnFailure
+      containers:
+      - name: atx-test-runner
+        image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/atx-test-runner:VERSION
+        imagePullPolicy: Always
+        command:
+          - /usr/local/bin/atx-orchestrator.sh
+        args:
+          - --csv-file
+          - /config/repos.csv
+          - --mode
+          - parallel
+          - --max-jobs
+          - "4"
+        env:
+        - name: AWS_DEFAULT_REGION
+          value: "us-east-1"
+        - name: ATX_LOG_LEVEL
+          value: "INFO"
+        - name: AWS_REGION
+          value: "us-east-1"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: atx-test-runner-config
+      - name: tmp
+        emptyDir:
+          sizeLimit: 10Gi
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: atx-test-runner-scheduled
+  namespace: atx-test-runner
+  labels:
+    app: atx-test-runner
+spec:
+  schedule: "0 2 * * *"  # Run daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: atx-test-runner
+        spec:
+          serviceAccountName: atx-test-runner
+          restartPolicy: OnFailure
+          containers:
+          - name: atx-test-runner
+            image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/atx-test-runner:VERSION
+            imagePullPolicy: Always
+            command:
+              - /usr/local/bin/atx-orchestrator.sh
+            args:
+              - --csv-file
+              - /config/repos.csv
+              - --mode
+              - parallel
+              - --max-jobs
+              - "4"
+            env:
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            - name: ATX_LOG_LEVEL
+              value: "INFO"
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "1000m"
+              limits:
+                memory: "4Gi"
+                cpu: "2000m"
+            volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          volumes:
+          - name: config
+            configMap:
+              name: atx-test-runner-config
+          - name: tmp
+            emptyDir:
+              sizeLimit: 10Gi

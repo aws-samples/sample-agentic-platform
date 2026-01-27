@@ -1,0 +1,11 @@
+# Example: Menu-Based Folder Structure
+# Use case: Processing Progress code organized by menu structure
+# Note: "menu" and "folder" are used interchangeably by customers
+
+s3_path,build_command,transformation_name,output_s3_path
+s3://progress-code/customer-xyz/menu-main/,noop,Comprehensive-Codebase-Analysis,s3://progress-results/customer-xyz/menu-main/
+s3://progress-code/customer-xyz/menu-accounting/,noop,Comprehensive-Codebase-Analysis,s3://progress-results/customer-xyz/menu-accounting/
+s3://progress-code/customer-xyz/menu-inventory/,noop,Comprehensive-Codebase-Analysis,s3://progress-results/customer-xyz/menu-inventory/
+s3://progress-code/customer-xyz/menu-sales/,noop,Comprehensive-Codebase-Analysis,s3://progress-results/customer-xyz/menu-sales/
+s3://progress-code/customer-xyz/menu-reports/,noop,Comprehensive-Codebase-Analysis,s3://progress-results/customer-xyz/menu-reports/
+s3://progress-code/customer-xyz/menu-utilities/,noop,Comprehensive-Codebase-Analysis,s3://progress-results/customer-xyz/menu-utilities/
