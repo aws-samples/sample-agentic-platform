@@ -1,0 +1,39 @@
+ATX Container Test Runner - Package Manifest
+Version: 0.1.0
+Created: 20251208-160758
+
+Essential Files:
+- Dockerfile                                    Container definition
+- .gitlab-ci.yml                                GitLab CI/CD pipeline (OIDC)
+- setup-gitlab-ci.sh                            OIDC setup script
+- USER-GUIDE.md                            Customer getting started guide
+- QUICK-REFERENCE.md                            Quick reference card
+- OIDC-SETUP-GUIDE.md                           OIDC authentication guide
+- GITLAB-DEPLOYMENT.md                          GitLab deployment guide
+- QUICKSTART-ECS.md                             ECS quick start guide
+
+Documentation:
+- docs/deployment-guide.md                      Complete deployment guide
+- docs/troubleshooting.md                       Troubleshooting guide
+- docs/build-and-test.md                        Build and test guide
+- docs/smoke-test.md                            Smoke test documentation
+
+Scripts:
+- scripts/atx-orchestrator.sh                   Main orchestration script
+- scripts/s3-integration.sh                     S3 operations
+- scripts/csv-parser.sh                         CSV parsing
+- scripts/smoke-test.sh                         Smoke test
+- scripts/push-to-ecr.sh                        ECR push automation
+- scripts/build-and-test.sh                     Build and test automation
+
+Deployment Templates:
+- deployment/cloudformation-complete-stack.yaml Complete CloudFormation stack
+- deployment/ecs-task-definition.json           ECS task definition
+- deployment/kubernetes-deployment.yaml         Kubernetes manifests
+- deployment/terraform/                         Terraform IaC files
+
+Examples:
+- examples/*.csv                                Sample CSV configurations
+- examples/ci-cd-integration.sh                 CI/CD integration example
+
+
