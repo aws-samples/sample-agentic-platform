@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "name": "Update Code Graph on File Save",
+  "description": "Re-parses a changed source file and updates the code graph incrementally on save.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.py",
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.java",
+      "**/*.tf",
+      "**/*.hcl"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A source file was just edited. Call the mcp_code_graph_update_file tool with the full absolute path of the file that was just saved to keep the code graph fresh. Just call the tool silently — no need to report back unless there's an error."
+  }
+}
