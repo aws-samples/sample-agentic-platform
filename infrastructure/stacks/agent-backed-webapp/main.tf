@@ -50,11 +50,12 @@ locals {
 module "cognito" {
   source = "../../modules/cognito"
 
-  name_prefix = local.name_prefix
-  common_tags = local.common_tags
-  environment = var.environment
-  domain_name = var.domain_name
-  use_custom_domain = var.use_custom_domain
+  name_prefix               = local.name_prefix
+  common_tags               = local.common_tags
+  environment               = var.environment
+  domain_name               = var.domain_name
+  use_custom_domain         = var.use_custom_domain
+  enable_federated_identity = false
 }
 
 ########################################################
@@ -127,13 +128,11 @@ module "lambda_agent_backend" {
         Sid    = "AgentCoreRuntimeAccess"
         Effect = "Allow"
         Action = [
-          "bedrock:InvokeAgent",
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream",
-          "bedrock:Retrieve",
-          "bedrock:RetrieveAndGenerate"
+          "bedrock-agentcore:InvokeAgentRuntime"
         ]
-        Resource = "*"
+        Resource = [
+          "arn:aws:bedrock-agentcore:${local.region}:*:runtime/*",
+        ]
       }
     ]
   })
@@ -154,7 +153,8 @@ module "api_gateway" {
   cognito_user_pool_endpoint = module.cognito.user_pool_endpoint
   cognito_client_id          = module.cognito.web_client_id
 
-  cors_allow_origins = ["*"]
+  cors_allow_origins     = ["https://${module.cloudfront.cloudfront_domain_name}"]
+  enable_access_logging  = true
 
   routes = {
     "POST /api/invoke" = {

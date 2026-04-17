@@ -36,6 +36,18 @@ variable "cors_allow_origins" {
   default     = ["*"]
 }
 
+variable "enable_access_logging" {
+  description = "Enable API Gateway access logging to CloudWatch"
+  type        = bool
+  default     = false
+}
+
+variable "access_log_retention_days" {
+  description = "CloudWatch log retention for API Gateway access logs"
+  type        = number
+  default     = 30
+}
+
 variable "routes" {
   description = "Map of route key to Lambda integration config. Key is the route (e.g., 'POST /api/invoke')"
   type = map(object({

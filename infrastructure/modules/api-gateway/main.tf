@@ -36,14 +36,47 @@ resource "aws_apigatewayv2_authorizer" "cognito" {
 }
 
 ########################################################
+# Access Logging (conditional)
+########################################################
+
+resource "aws_cloudwatch_log_group" "api_access_logs" {
+  count = var.enable_access_logging ? 1 : 0
+
+  name              = "/aws/apigateway/${var.name_prefix}${var.api_name}"
+  retention_in_days = var.access_log_retention_days
+
+  tags = merge(var.common_tags, {
+    Name = "${var.name_prefix}${var.api_name}-access-logs"
+  })
+}
+
+########################################################
 # Default Stage with Auto Deploy
 ########################################################
 
 resource "aws_apigatewayv2_stage" "default" {
-  # checkov:skip=CKV_AWS_73:Access logging disabled for sample application
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
   auto_deploy = true
+
+  dynamic "access_log_settings" {
+    for_each = var.enable_access_logging ? [1] : []
+    content {
+      destination_arn = aws_cloudwatch_log_group.api_access_logs[0].arn
+      format = jsonencode({
+        requestId       = "$context.requestId"
+        ip              = "$context.identity.sourceIp"
+        requestTime     = "$context.requestTime"
+        httpMethod      = "$context.httpMethod"
+        routeKey        = "$context.routeKey"
+        status          = "$context.status"
+        protocol        = "$context.protocol"
+        responseLength  = "$context.responseLength"
+        errorMessage    = "$context.error.message"
+        authorizerError = "$context.authorizer.error"
+      })
+    }
+  }
 
   tags = merge(var.common_tags, {
     Name = "${var.name_prefix}${var.api_name}-default-stage"
