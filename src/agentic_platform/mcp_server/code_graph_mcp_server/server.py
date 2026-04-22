@@ -25,6 +25,7 @@ from agentic_platform.tool.code_graph.cache import is_cache_valid, load_cache, s
 from agentic_platform.tool.code_graph.parser import parse_directory, parse_file
 from agentic_platform.tool.code_graph.graph import create_graph_store
 from agentic_platform.tool.code_graph import query_tools
+from agentic_platform.tool.code_graph.branch_extractor import extract_branches, branch_report_to_dict
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -255,6 +256,57 @@ class CodeGraphMCPServer:
                 return {"result": raw}
             except (TypeError, ValueError):
                 return {"result": str(raw)}
+
+        @self.mcp.tool()
+        def extract_file_branches(
+            file_path: str,
+            scope: str = "",
+        ) -> dict:
+            """
+            Extract all branch points from a source file.
+
+            Supports Python, TypeScript, JavaScript, and Java. Uses the same
+            tree-sitter parser as the code graph — no extra dependencies.
+
+            Enumerates every decision point: if/elif/else, try/catch/finally,
+            switch/case, match/case (Python 3.10+), and ternary expressions.
+            Each branch is annotated with its line number, enclosing
+            function/class, condition text, and a summary of each arm.
+
+            Use this to answer:
+              - "What are all the conditional paths through this function?"
+                (test generation — get the full branch map before writing tests)
+              - "What branches changed in this file?"
+                (code review — surface all conditional logic in a diff)
+              - "How complex is this module?"
+                (refactoring — cyclomatic_complexity ranks files for cleanup)
+              - "Are there bare catch blocks or auth-bypass conditions?"
+                (security audit — find risky patterns across the codebase)
+              - "What edge cases should the docstring mention?"
+                (documentation — auto-generate edge-case sections)
+
+            Args:
+                file_path: Path to the source file (absolute, or relative to
+                           the repo root set in REPO_PATH env var).
+                scope: Optional function or class name to restrict analysis to.
+                       Supports dotted names like "MyClass.myMethod".
+                       Leave empty to analyse the entire file.
+
+            Returns:
+                Dict with language, total_branches, cyclomatic_complexity, and
+                a branches list. Each branch has: branch_type, line,
+                enclosing_scope, condition, description, and arms (each arm
+                has kind, condition, line, body_summary).
+            """
+            if file_path and not os.path.isabs(file_path):
+                repo_path = os.getenv("REPO_PATH", ".")
+                file_path = os.path.join(repo_path, file_path)
+
+            report = extract_branches(
+                file_path=file_path,
+                scope=scope if scope else None,
+            )
+            return branch_report_to_dict(report)
 
         @self.mcp.tool()
         def rebuild_graph(repo_path: str = "") -> dict:

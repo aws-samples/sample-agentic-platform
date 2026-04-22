@@ -19,9 +19,31 @@ Source code never leaves your machine — only the derived graph is queried.
 | `find_importers` | What files import this module? |
 | `trace_impact` | Full impact analysis — callers + importers combined |
 | `graph_stats` | Node/edge counts to confirm graph loaded correctly |
+| `extract_file_branches` | Enumerate every if/elif/else, try/except, match/case, and ternary in a file or function |
 | `update_file` | Incrementally re-parse a single changed file (called by the file-watch Kiro-specific hook) |
 | `run_query` | Execute a custom Python query against the raw graph |
 | `rebuild_graph` | Refresh the entire graph after major changes |
+
+### `extract_file_branches` — branch map for any Python file
+
+Returns every decision point in a file or a specific function/class, annotated with line numbers, condition text, enclosing scope, and a summary of each arm.
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `file_path` | str | required | Path to the Python file (absolute or relative to `REPO_PATH`) |
+| `scope` | str | `""` | Restrict to a function or class, e.g. `"MyClass.my_method"`. Empty = whole file |
+| `include_boolean_ops` | bool | `false` | Include `and`/`or` short-circuits. Useful for security audits, noisy for test gen |
+| `include_asserts` | bool | `false` | Include `assert` statements as implicit branches |
+
+**Use cases**
+
+- **Test generation** — get the full branch map before writing a single test case
+- **Code review** — surface all conditional logic changed in a diff
+- **Complexity analysis** — `cyclomatic_complexity` ranks files/functions for refactoring
+- **Documentation** — auto-generate edge-case sections for docstrings
+- **Security audits** — find bare `except:` clauses, auth-bypass `if environment == 'local'` conditions
 
 ## How it works
 
