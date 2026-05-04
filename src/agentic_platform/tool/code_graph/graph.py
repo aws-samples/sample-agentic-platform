@@ -9,6 +9,7 @@ MCP server README for future backend options.
 
 import logging
 from abc import ABC, abstractmethod
+from collections import deque
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,14 @@ class GraphStore(ABC):
     @abstractmethod
     def find_branches(self, scope: str) -> Optional[dict]:
         """Return branch metadata for a function/method by its dotted scope name."""
+
+    @abstractmethod
+    def get_node_data(self, node_id: str) -> Optional[dict]:
+        """Return node attributes by ID, or None if not found."""
+
+    @abstractmethod
+    def out_edges(self, node_id: str, edge_types: Optional[set[str]] = None) -> list[tuple[str, dict]]:
+        """Return outgoing edges as (target_id, edge_data) pairs, optionally filtered by edge type."""
 
     @abstractmethod
     def node_count(self) -> int:
@@ -82,28 +91,32 @@ class NetworkXGraphStore(GraphStore):
                 file=node.file,
                 line=node.line,
                 language=node.language,
-                **node.metadata,
+                metadata=node.metadata,
             )
             self._name_index.setdefault(node.name, []).append(node.id)
 
-        # Build dotted Class.method entries in the index by walking DEFINES
-        # edges from Class nodes to their children. This lets
-        # find_branches("StrandsJiraAgent.invoke") resolve directly.
+        # Build dotted Class.method entries in the index using a pre-indexed
+        # edge lookup — O(classes × edges_per_class) instead of O(n² × e).
+        edges_by_source: dict[str, list] = {}
+        for edge in edges:
+            edges_by_source.setdefault(edge.source_id, []).append(edge)
+
         for node in nodes:
             if node.node_type == "Class":
-                for child in nodes:
-                    if (child.file == node.file
-                            and child.node_type in ("Method", "Function")
-                            and child.id != node.id):
-                        # Check if the class DEFINES this child (via edges list)
-                        for edge in edges:
-                            if (edge.source_id == node.id
-                                    and edge.target_name == child.name
-                                    and edge.edge_type == "DEFINES"):
-                                dotted = f"{node.name}.{child.name}"
+                for edge in edges_by_source.get(node.id, []):
+                    if edge.edge_type == "DEFINES":
+                        dotted = f"{node.name}.{edge.target_name}"
+                        # Find the child node ID — must be in the same file
+                        # and scoped under this class (ID contains "ClassName.method")
+                        child_ids = self._name_index.get(edge.target_name, [])
+                        expected_scope = f"{node.name}.{edge.target_name}"
+                        for cid in child_ids:
+                            cid_scope = cid.split("::", 1)[1].rsplit("::", 1)[0]
+                            if (cid_scope == expected_scope
+                                    and self._graph.nodes.get(cid, {}).get("file") == node.file):
                                 ids = self._name_index.setdefault(dotted, [])
-                                if child.id not in ids:
-                                    ids.append(child.id)
+                                if cid not in ids:
+                                    ids.append(cid)
                                 break
 
         resolved = 0
@@ -265,12 +278,9 @@ class NetworkXGraphStore(GraphStore):
         # Try exact dotted lookup first (e.g. "StrandsJiraAgent.invoke")
         candidate_ids = self._name_index.get(scope, [])
 
-        # Fall back to bare name only if no dot was given
-        if not candidate_ids and "." not in scope:
-            candidate_ids = self._name_index.get(scope, [])
-        elif not candidate_ids and "." in scope:
-            # Dotted scope didn't match the index — try resolving via
-            # the class's DEFINES edges as a last resort
+        # Dotted scope didn't match the index — try resolving via
+        # the class's DEFINES edges as a last resort
+        if not candidate_ids and "." in scope:
             parts = scope.rsplit(".", 1)
             class_name, method_name = parts[0], parts[1]
             class_ids = self._name_index.get(class_name, [])
@@ -286,19 +296,20 @@ class NetworkXGraphStore(GraphStore):
         # Collect candidates that have branch data
         for nid in candidate_ids:
             node_data = self._graph.nodes[nid]
-            branches = node_data.get("branches", [])
+            branches = node_data.get("metadata", {}).get("branches", [])
             # Also collect branches from nested functions (DEFINES children, recursive)
             nested_branches = []
-            queue = [nid]
+            queue = deque([nid])
             visited = {nid}
             while queue:
-                current = queue.pop(0)
+                current = queue.popleft()
                 for _, child_id, data in self._graph.out_edges(current, data=True):
                     if data.get("edge_type") == "DEFINES" and child_id not in visited:
                         visited.add(child_id)
                         child_data = self._graph.nodes[child_id]
-                        if child_data.get("branches"):
-                            nested_branches.extend(child_data["branches"])
+                        child_branches = child_data.get("metadata", {}).get("branches")
+                        if child_branches:
+                            nested_branches.extend(child_branches)
                         queue.append(child_id)
             all_branches = branches + nested_branches
             if all_branches:
@@ -320,6 +331,22 @@ class NetworkXGraphStore(GraphStore):
                 }
 
         return None
+
+    def get_node_data(self, node_id: str) -> Optional[dict]:
+        """Return node attributes by ID, or None if not found."""
+        if node_id not in self._graph:
+            return None
+        return dict(self._graph.nodes[node_id])
+
+    def out_edges(self, node_id: str, edge_types: Optional[set[str]] = None) -> list[tuple[str, dict]]:
+        """Return outgoing edges as (target_id, edge_data) pairs."""
+        if node_id not in self._graph:
+            return []
+        results = []
+        for _, target, data in self._graph.out_edges(node_id, data=True):
+            if edge_types is None or data.get("edge_type") in edge_types:
+                results.append((target, dict(data)))
+        return results
 
     def remove_file(self, file_path: str) -> None:
         """Remove all nodes and edges associated with a file (for incremental updates)."""

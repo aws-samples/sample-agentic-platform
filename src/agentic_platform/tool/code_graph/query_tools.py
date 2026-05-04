@@ -17,6 +17,7 @@ context to the LLM and letting it synthesize an answer from template results.
 """
 
 import logging
+from collections import deque
 from .graph import GraphStore
 
 logger = logging.getLogger(__name__)
@@ -295,16 +296,16 @@ def walk_branches(graph: GraphStore, entry_point: str) -> dict:
     # Collect all reachable internal functions via BFS on CALLS/DEFINES/IMPORTS edges
     WALK_EDGE_TYPES = {"CALLS", "DEFINES", "IMPORTS"}
     visited: set[str] = set()
-    queue = [node["id"]]
+    queue = deque([node["id"]])
     function_nodes: list[dict] = []
 
     while queue:
-        nid = queue.pop(0)
+        nid = queue.popleft()
         if nid in visited:
             continue
         visited.add(nid)
 
-        nd = graph._graph.nodes.get(nid)
+        nd = graph.get_node_data(nid)
         if not nd:
             continue
 
@@ -317,10 +318,9 @@ def walk_branches(graph: GraphStore, entry_point: str) -> dict:
             function_nodes.append({"id": nid, **nd})
 
         # Walk outgoing CALLS, DEFINES, and IMPORTS edges
-        for _, child_id, data in graph._graph.out_edges(nid, data=True):
-            if data.get("edge_type") in WALK_EDGE_TYPES:
-                if child_id not in visited:
-                    queue.append(child_id)
+        for child_id, data in graph.out_edges(nid, WALK_EDGE_TYPES):
+            if child_id not in visited:
+                queue.append(child_id)
 
     # For each function node, collect branch data
     functions_with_branches = []
@@ -330,7 +330,9 @@ def walk_branches(graph: GraphStore, entry_point: str) -> dict:
     for fn in function_nodes:
         if fn.get("node_type") not in ("Function", "Method"):
             continue
-        branch_result = graph.find_branches(fn["name"])
+        # Extract scoped name from node ID: "file::MyClass.invoke::Function" → "MyClass.invoke"
+        fn_scope = fn["id"].split("::", 1)[1].rsplit("::", 1)[0]
+        branch_result = graph.find_branches(fn_scope)
         if branch_result:
             entry = {
                 "name": fn["name"],
@@ -361,16 +363,18 @@ def walk_branches(graph: GraphStore, entry_point: str) -> dict:
     # P2: Diagnostics when walk finds 0 functions with branches
     diagnostic = None
     if not functions_with_branches:
-        out_edges = [(graph._graph.nodes.get(v, {}).get("name", v),
-                      d.get("edge_type"))
-                     for _, v, d in graph._graph.out_edges(node["id"], data=True)]
+        raw_edges = graph.out_edges(node["id"])
         edge_counts = {}
-        for _, et in out_edges:
+        internal_targets = []
+        for target_id, data in raw_edges:
+            et = data.get("edge_type")
             edge_counts[et] = edge_counts.get(et, 0) + 1
-        internal_targets = [name for name, et in out_edges
-                            if et in WALK_EDGE_TYPES and not name.startswith("external::")]
+            nd = graph.get_node_data(target_id)
+            tname = nd.get("name", target_id) if nd else target_id
+            if et in WALK_EDGE_TYPES and not target_id.startswith("external::"):
+                internal_targets.append(tname)
         diagnostic = (
-            f"Entry point '{entry_point}' has {len(out_edges)} outgoing edge(s) "
+            f"Entry point '{entry_point}' has {len(raw_edges)} outgoing edge(s) "
             f"(types: {edge_counts}) but walk reached 0 functions with branches. "
             f"Internal targets reachable: {internal_targets[:10]}. "
             f"Nodes visited: {len(visited)}. "
@@ -385,7 +389,8 @@ def walk_branches(graph: GraphStore, entry_point: str) -> dict:
                 fn_node_id = fnode.get("id")
                 break
         if fn_node_id:
-            decorators = graph._graph.nodes.get(fn_node_id, {}).get("metadata", {}).get("decorators", [])
+            nd = graph.get_node_data(fn_node_id)
+            decorators = (nd or {}).get("metadata", {}).get("decorators", [])
             if decorators:
                 fn["decorators"] = decorators
 

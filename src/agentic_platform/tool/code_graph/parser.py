@@ -20,6 +20,38 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Lazy-initialized tree-sitter parsers — one per language, reused across files.
+_PARSERS: dict[str, "Parser"] = {}
+
+
+def _get_parser(language: str):
+    """Return a cached tree-sitter Parser for the given language, or None."""
+    if language in _PARSERS:
+        return _PARSERS[language]
+    try:
+        from tree_sitter import Language, Parser
+        if language == "python":
+            import tree_sitter_python as tspython
+            lang = Language(tspython.language())
+        elif language == "typescript":
+            import tree_sitter_typescript as tsts
+            lang = Language(tsts.language_typescript())
+        elif language == "java":
+            import tree_sitter_java as tsjava
+            lang = Language(tsjava.language())
+        elif language == "terraform":
+            import tree_sitter_hcl as tshcl
+            lang = Language(tshcl.language())
+        else:
+            return None
+        parser = Parser(lang)
+        _PARSERS[language] = parser
+        return parser
+    except ImportError:
+        logger.warning("tree-sitter grammar for %s not installed", language)
+        return None
+
+
 # Language detection by file extension
 EXTENSION_TO_LANGUAGE = {
     ".py": "python",
@@ -63,14 +95,8 @@ class ParseResult:
 
 def _parse_python(source: str, file_path: str) -> ParseResult:
     """Extract nodes and edges from a Python source file."""
-    try:
-        import tree_sitter_python as tspython
-        from tree_sitter import Language, Parser
-
-        PY_LANGUAGE = Language(tspython.language())
-        parser = Parser(PY_LANGUAGE)
-    except ImportError:
-        logger.warning("tree-sitter-python not installed, skipping %s", file_path)
+    parser = _get_parser("python")
+    if not parser:
         return ParseResult()
 
     result = ParseResult()
@@ -88,7 +114,7 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
         language="python",
     ))
 
-    def walk(node, parent_id: Optional[str] = None):
+    def walk(node, parent_id: Optional[str] = None, parent_name: str = ""):
         if node.type == "import_statement" or node.type == "import_from_statement":
             # Extract import edges
             for child in node.children:
@@ -102,11 +128,12 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
                         line=node.start_point[0] + 1,
                     ))
 
-        elif node.type == "function_definition":
+        elif node.type in ("function_definition", "async_function_definition"):
             name_node = node.child_by_field_name("name")
             if name_node:
                 name = source[name_node.start_byte:name_node.end_byte]
-                node_id = f"{file_path}::{name}::Function"
+                scoped = f"{parent_name}.{name}" if parent_name else name
+                node_id = f"{file_path}::{scoped}::Function"
                 # Capture decorators from parent decorated_definition
                 decorators = []
                 if node.parent and node.parent.type == "decorated_definition":
@@ -131,14 +158,15 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
                         line=node.start_point[0] + 1,
                     ))
                 for child in node.children:
-                    walk(child, node_id)
+                    walk(child, node_id, scoped)
                 return  # already walked children
 
         elif node.type == "class_definition":
             name_node = node.child_by_field_name("name")
             if name_node:
                 name = source[name_node.start_byte:name_node.end_byte]
-                node_id = f"{file_path}::{name}::Class"
+                scoped = f"{parent_name}.{name}" if parent_name else name
+                node_id = f"{file_path}::{scoped}::Class"
                 result.nodes.append(GraphNode(
                     id=node_id,
                     name=name,
@@ -170,7 +198,7 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
                                 line=node.start_point[0] + 1,
                             ))
                 for child in node.children:
-                    walk(child, node_id)
+                    walk(child, node_id, scoped)
                 return
 
         elif node.type == "call":
@@ -212,7 +240,7 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
                         ))
 
         for child in node.children:
-            walk(child, parent_id)
+            walk(child, parent_id, parent_name)
 
     walk(root, module_id)
     return result
@@ -220,14 +248,8 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
 
 def _parse_typescript(source: str, file_path: str) -> ParseResult:
     """Extract nodes and edges from a TypeScript/JavaScript source file."""
-    try:
-        import tree_sitter_typescript as tsts
-        from tree_sitter import Language, Parser
-
-        TS_LANGUAGE = Language(tsts.language_typescript())
-        parser = Parser(TS_LANGUAGE)
-    except ImportError:
-        logger.warning("tree-sitter-typescript not installed, skipping %s", file_path)
+    parser = _get_parser("typescript")
+    if not parser:
         return ParseResult()
 
     result = ParseResult()
@@ -244,7 +266,7 @@ def _parse_typescript(source: str, file_path: str) -> ParseResult:
         language="typescript",
     ))
 
-    def walk(node, parent_id: Optional[str] = None):
+    def walk(node, parent_id: Optional[str] = None, parent_name: str = ""):
         if node.type in ("import_statement", "import_declaration"):
             for child in node.children:
                 if child.type == "string":
@@ -261,7 +283,8 @@ def _parse_typescript(source: str, file_path: str) -> ParseResult:
             name_node = node.child_by_field_name("name")
             if name_node:
                 name = source[name_node.start_byte:name_node.end_byte]
-                node_id = f"{file_path}::{name}::Function"
+                scoped = f"{parent_name}.{name}" if parent_name else name
+                node_id = f"{file_path}::{scoped}::Function"
                 result.nodes.append(GraphNode(
                     id=node_id,
                     name=name,
@@ -279,14 +302,15 @@ def _parse_typescript(source: str, file_path: str) -> ParseResult:
                         line=node.start_point[0] + 1,
                     ))
                 for child in node.children:
-                    walk(child, node_id)
+                    walk(child, node_id, scoped)
                 return
 
         elif node.type == "class_declaration":
             name_node = node.child_by_field_name("name")
             if name_node:
                 name = source[name_node.start_byte:name_node.end_byte]
-                node_id = f"{file_path}::{name}::Class"
+                scoped = f"{parent_name}.{name}" if parent_name else name
+                node_id = f"{file_path}::{scoped}::Class"
                 result.nodes.append(GraphNode(
                     id=node_id,
                     name=name,
@@ -296,7 +320,7 @@ def _parse_typescript(source: str, file_path: str) -> ParseResult:
                     language="typescript",
                 ))
                 for child in node.children:
-                    walk(child, node_id)
+                    walk(child, node_id, scoped)
                 return
 
         elif node.type == "call_expression":
@@ -312,7 +336,7 @@ def _parse_typescript(source: str, file_path: str) -> ParseResult:
                 ))
 
         for child in node.children:
-            walk(child, parent_id)
+            walk(child, parent_id, parent_name)
 
     walk(root, module_id)
     return result
@@ -320,14 +344,8 @@ def _parse_typescript(source: str, file_path: str) -> ParseResult:
 
 def _parse_java(source: str, file_path: str) -> ParseResult:
     """Extract nodes and edges from a Java source file."""
-    try:
-        import tree_sitter_java as tsjava
-        from tree_sitter import Language, Parser
-
-        JAVA_LANGUAGE = Language(tsjava.language())
-        parser = Parser(JAVA_LANGUAGE)
-    except ImportError:
-        logger.warning("tree-sitter-java not installed, skipping %s", file_path)
+    parser = _get_parser("java")
+    if not parser:
         return ParseResult()
 
     result = ParseResult()
@@ -344,7 +362,7 @@ def _parse_java(source: str, file_path: str) -> ParseResult:
         language="java",
     ))
 
-    def walk(node, parent_id: Optional[str] = None):
+    def walk(node, parent_id: Optional[str] = None, parent_name: str = ""):
         if node.type == "import_declaration":
             for child in node.children:
                 if child.type == "scoped_identifier":
@@ -361,7 +379,8 @@ def _parse_java(source: str, file_path: str) -> ParseResult:
             name_node = node.child_by_field_name("name")
             if name_node:
                 name = source[name_node.start_byte:name_node.end_byte]
-                node_id = f"{file_path}::{name}::Class"
+                scoped = f"{parent_name}.{name}" if parent_name else name
+                node_id = f"{file_path}::{scoped}::Class"
                 result.nodes.append(GraphNode(
                     id=node_id,
                     name=name,
@@ -371,14 +390,15 @@ def _parse_java(source: str, file_path: str) -> ParseResult:
                     language="java",
                 ))
                 for child in node.children:
-                    walk(child, node_id)
+                    walk(child, node_id, scoped)
                 return
 
         elif node.type == "method_declaration":
             name_node = node.child_by_field_name("name")
             if name_node:
                 name = source[name_node.start_byte:name_node.end_byte]
-                node_id = f"{file_path}::{name}::Method"
+                scoped = f"{parent_name}.{name}" if parent_name else name
+                node_id = f"{file_path}::{scoped}::Method"
                 result.nodes.append(GraphNode(
                     id=node_id,
                     name=name,
@@ -396,7 +416,7 @@ def _parse_java(source: str, file_path: str) -> ParseResult:
                         line=node.start_point[0] + 1,
                     ))
                 for child in node.children:
-                    walk(child, node_id)
+                    walk(child, node_id, scoped)
                 return
 
         elif node.type == "method_invocation":
@@ -412,7 +432,7 @@ def _parse_java(source: str, file_path: str) -> ParseResult:
                 ))
 
         for child in node.children:
-            walk(child, parent_id)
+            walk(child, parent_id, parent_name)
 
     walk(root, module_id)
     return result
@@ -420,14 +440,8 @@ def _parse_java(source: str, file_path: str) -> ParseResult:
 
 def _parse_terraform(source: str, file_path: str) -> ParseResult:
     """Extract nodes and edges from a Terraform/HCL source file."""
-    try:
-        import tree_sitter_hcl as tshcl
-        from tree_sitter import Language, Parser
-
-        HCL_LANGUAGE = Language(tshcl.language())
-        parser = Parser(HCL_LANGUAGE)
-    except ImportError:
-        logger.warning("tree-sitter-hcl not installed, skipping %s", file_path)
+    parser = _get_parser("terraform")
+    if not parser:
         return ParseResult()
 
     result = ParseResult()
@@ -444,7 +458,7 @@ def _parse_terraform(source: str, file_path: str) -> ParseResult:
         language="terraform",
     ))
 
-    def walk(node, parent_id: Optional[str] = None):
+    def walk(node, parent_id: Optional[str] = None, parent_name: str = ""):
         # Terraform resources: resource "aws_s3_bucket" "my_bucket" { ... }
         if node.type == "block":
             children = node.children
@@ -466,7 +480,7 @@ def _parse_terraform(source: str, file_path: str) -> ParseResult:
                         ))
 
         for child in node.children:
-            walk(child, parent_id)
+            walk(child, parent_id, parent_name)
 
     walk(root, module_id)
     return result
@@ -527,13 +541,14 @@ def parse_file(file_path: str) -> ParseResult:
 
             for node in result.nodes:
                 if node.node_type in ("Function", "Method"):
-                    # Match on the last component of the scope path
-                    # e.g. node.name "invoke" matches scope "StrandsJiraAgent.invoke"
-                    node_branches = []
-                    for scope, branches in by_scope.items():
-                        scope_leaf = scope.split(".")[-1]
-                        if scope_leaf == node.name:
-                            node_branches.extend(branches)
+                    # Extract the scoped name from the node ID:
+                    # "file::MyClass.invoke::Function" → "MyClass.invoke"
+                    id_scope = node.id.split("::", 1)[1].rsplit("::", 1)[0]
+                    # Match against the branch's enclosing_scope exactly,
+                    # or match bare name for module-level functions
+                    node_branches = by_scope.get(id_scope, [])
+                    if not node_branches:
+                        node_branches = by_scope.get(node.name, [])
                     if node_branches:
                         node.metadata["branches"] = node_branches
                         node.metadata["cyclomatic_complexity"] = (

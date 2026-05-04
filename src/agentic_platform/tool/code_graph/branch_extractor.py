@@ -23,7 +23,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Re-use the language/extension map from the parser so they stay in sync
-from agentic_platform.tool.code_graph.parser import EXTENSION_TO_LANGUAGE
+from agentic_platform.tool.code_graph.parser import EXTENSION_TO_LANGUAGE, _get_parser
 
 
 # ---------------------------------------------------------------------------
@@ -96,12 +96,8 @@ def _node_end_line(node) -> int:
 # ---------------------------------------------------------------------------
 
 def _extract_python(src: bytes, scope: Optional[str]) -> list[Branch]:
-    try:
-        import tree_sitter_python as tspython
-        from tree_sitter import Language, Parser
-        parser = Parser(Language(tspython.language()))
-    except ImportError:
-        logger.warning("tree-sitter-python not installed; cannot extract branches")
+    parser = _get_parser("python")
+    if not parser:
         return []
 
     tree = parser.parse(src)
@@ -299,12 +295,8 @@ def _extract_python(src: bytes, scope: Optional[str]) -> list[Branch]:
 # ---------------------------------------------------------------------------
 
 def _extract_typescript(src: bytes, scope: Optional[str]) -> list[Branch]:
-    try:
-        import tree_sitter_typescript as tsts
-        from tree_sitter import Language, Parser
-        parser = Parser(Language(tsts.language_typescript()))
-    except ImportError:
-        logger.warning("tree-sitter-typescript not installed; cannot extract branches")
+    parser = _get_parser("typescript")
+    if not parser:
         return []
 
     tree = parser.parse(src)
@@ -501,12 +493,8 @@ def _extract_typescript(src: bytes, scope: Optional[str]) -> list[Branch]:
 # ---------------------------------------------------------------------------
 
 def _extract_java(src: bytes, scope: Optional[str]) -> list[Branch]:
-    try:
-        import tree_sitter_java as tsjava
-        from tree_sitter import Language, Parser
-        parser = Parser(Language(tsjava.language()))
-    except ImportError:
-        logger.warning("tree-sitter-java not installed; cannot extract branches")
+    parser = _get_parser("java")
+    if not parser:
         return []
 
     tree = parser.parse(src)

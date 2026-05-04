@@ -328,6 +328,7 @@ The graph gives you the complete, structural answer in one call.""",
 
             graph = self._get_graph()
             local_ns = {
+                "__builtins__": {},
                 "G": graph._graph,
                 "idx": graph._name_index,
                 "collections": _collections,
