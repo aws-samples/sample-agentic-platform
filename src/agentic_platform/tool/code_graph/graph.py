@@ -42,6 +42,10 @@ class GraphStore(ABC):
         """Remove all nodes and edges for a file (used for incremental updates)."""
 
     @abstractmethod
+    def find_branches(self, scope: str) -> Optional[dict]:
+        """Return branch metadata for a function/method by its dotted scope name."""
+
+    @abstractmethod
     def node_count(self) -> int:
         """Return total number of nodes in the graph."""
 
@@ -82,14 +86,49 @@ class NetworkXGraphStore(GraphStore):
             )
             self._name_index.setdefault(node.name, []).append(node.id)
 
+        # Build dotted Class.method entries in the index by walking DEFINES
+        # edges from Class nodes to their children. This lets
+        # find_branches("StrandsJiraAgent.invoke") resolve directly.
+        for node in nodes:
+            if node.node_type == "Class":
+                for child in nodes:
+                    if (child.file == node.file
+                            and child.node_type in ("Method", "Function")
+                            and child.id != node.id):
+                        # Check if the class DEFINES this child (via edges list)
+                        for edge in edges:
+                            if (edge.source_id == node.id
+                                    and edge.target_name == child.name
+                                    and edge.edge_type == "DEFINES"):
+                                dotted = f"{node.name}.{child.name}"
+                                ids = self._name_index.setdefault(dotted, [])
+                                if child.id not in ids:
+                                    ids.append(child.id)
+                                break
+
         resolved = 0
         unresolved = 0
+        seen_edges: set[tuple[str, str, str]] = set()
         for edge in edges:
             source_id = edge.source_id
             # Resolve target name to node id(s)
             target_ids = self._name_index.get(edge.target_name, [])
+
+            # For DEFINES edges, restrict to targets in the same file
+            # to prevent fan-out (e.g. every __init__ in the codebase)
+            if edge.edge_type == "DEFINES" and target_ids:
+                source_file = self._graph.nodes[source_id].get("file", "")
+                target_ids = [
+                    tid for tid in target_ids
+                    if self._graph.nodes.get(tid, {}).get("file", "") == source_file
+                ]
+
             if target_ids:
                 for target_id in target_ids:
+                    key = (source_id, target_id, edge.edge_type)
+                    if key in seen_edges:
+                        continue
+                    seen_edges.add(key)
                     self._graph.add_edge(
                         source_id,
                         target_id,
@@ -104,12 +143,15 @@ class NetworkXGraphStore(GraphStore):
                 if ext_id not in self._graph:
                     self._graph.add_node(ext_id, name=edge.target_name, node_type="External",
                                          file="", line=0, language="unknown")
-                self._graph.add_edge(
-                    source_id, ext_id,
-                    edge_type=edge.edge_type,
-                    file=edge.file,
-                    line=edge.line,
-                )
+                key = (source_id, ext_id, edge.edge_type)
+                if key not in seen_edges:
+                    seen_edges.add(key)
+                    self._graph.add_edge(
+                        source_id, ext_id,
+                        edge_type=edge.edge_type,
+                        file=edge.file,
+                        line=edge.line,
+                    )
                 unresolved += 1
 
         logger.info("Graph loaded: %d nodes, %d edges (%d resolved, %d external)",
@@ -209,6 +251,76 @@ class NetworkXGraphStore(GraphStore):
         data = self._graph.nodes[ids[0]]
         return {"id": ids[0], **data}
 
+    def find_branches(self, scope: str) -> Optional[dict]:
+        """
+        Return branch metadata for a function/method by name or dotted scope.
+
+        scope can be:
+          - a bare function name:  "invoke"
+          - a dotted scope:        "StrandsJiraAgent.invoke"
+
+        Returns the first matching node's branch data, or None if not found
+        or the node has no branch metadata.
+        """
+        # Try exact dotted lookup first (e.g. "StrandsJiraAgent.invoke")
+        candidate_ids = self._name_index.get(scope, [])
+
+        # Fall back to bare name only if no dot was given
+        if not candidate_ids and "." not in scope:
+            candidate_ids = self._name_index.get(scope, [])
+        elif not candidate_ids and "." in scope:
+            # Dotted scope didn't match the index — try resolving via
+            # the class's DEFINES edges as a last resort
+            parts = scope.rsplit(".", 1)
+            class_name, method_name = parts[0], parts[1]
+            class_ids = self._name_index.get(class_name, [])
+            for class_id in class_ids:
+                for _, child_id, data in self._graph.out_edges(class_id, data=True):
+                    if (data.get("edge_type") == "DEFINES"
+                            and self._graph.nodes[child_id].get("name") == method_name):
+                        candidate_ids = [child_id]
+                        break
+                if candidate_ids:
+                    break
+
+        # Collect candidates that have branch data
+        for nid in candidate_ids:
+            node_data = self._graph.nodes[nid]
+            branches = node_data.get("branches", [])
+            # Also collect branches from nested functions (DEFINES children, recursive)
+            nested_branches = []
+            queue = [nid]
+            visited = {nid}
+            while queue:
+                current = queue.pop(0)
+                for _, child_id, data in self._graph.out_edges(current, data=True):
+                    if data.get("edge_type") == "DEFINES" and child_id not in visited:
+                        visited.add(child_id)
+                        child_data = self._graph.nodes[child_id]
+                        if child_data.get("branches"):
+                            nested_branches.extend(child_data["branches"])
+                        queue.append(child_id)
+            all_branches = branches + nested_branches
+            if all_branches:
+                complexity = (
+                    sum(
+                        sum(1 for a in b["arms"]
+                            if a["kind"] in ("if", "elif", "except", "catch", "case"))
+                        for b in all_branches
+                    ) + 1
+                )
+                return {
+                    "scope": scope,
+                    "file": node_data.get("file"),
+                    "line": node_data.get("line"),
+                    "language": node_data.get("language"),
+                    "cyclomatic_complexity": complexity,
+                    "total_branches": len(all_branches),
+                    "branches": all_branches,
+                }
+
+        return None
+
     def remove_file(self, file_path: str) -> None:
         """Remove all nodes and edges associated with a file (for incremental updates)."""
         nodes_to_remove = [
@@ -216,7 +328,7 @@ class NetworkXGraphStore(GraphStore):
             if d.get("file") == file_path
         ]
         for node_id in nodes_to_remove:
-            # Clean up name index
+            # Clean up name index (bare name and any dotted entries)
             name = self._graph.nodes[node_id].get("name")
             if name and name in self._name_index:
                 self._name_index[name] = [
@@ -224,6 +336,15 @@ class NetworkXGraphStore(GraphStore):
                 ]
                 if not self._name_index[name]:
                     del self._name_index[name]
+            # Also clean dotted entries (e.g. "ClassName.method")
+            to_delete = []
+            for key, ids in self._name_index.items():
+                if node_id in ids:
+                    ids.remove(node_id)
+                    if not ids:
+                        to_delete.append(key)
+            for key in to_delete:
+                del self._name_index[key]
             self._graph.remove_node(node_id)
         logger.info("Removed %d nodes for file: %s", len(nodes_to_remove), file_path)
 

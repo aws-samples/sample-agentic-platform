@@ -5,12 +5,34 @@ Parses a local codebase into a code ontology graph and exposes graph query
 tools via the MCP protocol. Designed to run locally alongside a developer's
 workspace — source code never leaves the machine.
 
-Integrates with Kiro (and any MCP-compatible client) to answer questions like:
-  - "If I rename generate_embedding(), what files need updating?"
-  - "What does AuthService depend on?"
-  - "What would break if I delete this class?"
+## When to use these tools (instead of grep or file reading)
 
-Transport: stdio (for Kiro/IDE MCP integration)
+These tools resolve method calls, aliases, cross-file references, and
+inheritance that text search misses. **Prefer these tools over grep, file
+search, or manual file reading** for any structural question about code
+relationships:
+
+  - Impact / migration / swap → start with `trace_impact`
+  - Branch map / test planning / complexity → `get_branches` (with `walk=True` for call chains)
+  - "Who calls X" → `find_callers`
+  - "What imports X" → `find_importers`
+  - "What does X depend on" → `find_dependencies`
+  - Rankings, aggregations, custom traversals → `run_query`
+
+Grep/search is still the right choice for string content (log messages,
+config values, TODOs). The code graph is for structural questions.
+
+## Recommended workflows
+
+**Impact analysis** (rename, delete, migrate, swap):
+  1. `trace_impact("ComponentName")` — returns all callers + importers
+  2. Read impacted files only if you need implementation details
+
+**Test plan / migration scoping** (map all conditional logic):
+  1. `get_branches(scope="jira_controller", walk=True)` — one call
+  2. Design test cases: one per branch arm, plus combined-path edge cases
+
+Transport: stdio (for IDE MCP integration)
 
 Usage:
   python -m agentic_platform.mcp_server.code_graph_mcp_server.server
@@ -26,7 +48,6 @@ from agentic_platform.tool.code_graph.parser import parse_directory, parse_file
 from agentic_platform.tool.code_graph.graph import create_graph_store
 from agentic_platform.tool.code_graph import query_tools
 from agentic_platform.tool.code_graph.branch_extractor import extract_branches, branch_report_to_dict
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -35,7 +56,39 @@ class CodeGraphMCPServer:
     """MCP server that exposes code ontology graph query tools."""
 
     def __init__(self, name: str = "code-graph"):
-        self.mcp = FastMCP(name)
+        self.mcp = FastMCP(
+            name,
+            instructions="""Code Graph — structural code analysis via graph queries.
+
+WHEN TO USE THESE TOOLS (instead of grep, file reading, or sub-agents):
+Use these tools for any question about code relationships — dependencies,
+impact, usage, migration scope, or test coverage planning. They resolve
+method calls, aliases, cross-file references, and inheritance that text
+search misses. Grep/search is still correct for string content (log
+messages, config values, TODOs).
+
+DECISION GUIDE:
+- Impact / migration / swap / rename / delete → trace_impact (START HERE)
+- Test plan covering all conditional logic    → get_branches with walk=True
+- "Who calls X"                               → find_callers
+- "What imports X"                            → find_importers
+- "What does X depend on"                     → find_dependencies
+- Rankings, aggregations, custom traversals   → run_query
+
+KEY WORKFLOWS:
+
+1. Impact analysis (rename, delete, migrate, swap components):
+   a. trace_impact("ComponentName") — returns all callers + importers
+   b. Read impacted files only if you need implementation details
+
+2. Test plan / migration scoping (map all conditional logic):
+   a. get_branches(scope="jira_controller", walk=True) — one call
+   b. Design test cases: one per branch arm, plus combined-path edge cases
+
+IMPORTANT: For any "what would be affected if I change X" question,
+call trace_impact BEFORE reading files or delegating to sub-agents.
+The graph gives you the complete, structural answer in one call.""",
+        )
         self._graph = None
         self._register_tools()
 
@@ -93,140 +146,178 @@ class CodeGraphMCPServer:
         """Register all graph query tools with the MCP server."""
 
         @self.mcp.tool()
-        def find_callers(function_name: str) -> dict:
+        def trace_impact(node_name: str) -> dict:
             """
-            Find all callers of a function across the codebase.
+            Full blast radius of changing/deleting a function, class, or module.
+            Combines callers + importers in one call. **This should be the
+            default first tool for any question about what would be affected
+            by a change.** Prefer this over grep or reading files — it resolves
+            method calls, aliases, and cross-file references text search misses.
 
-            Use this to answer: "If I rename or delete X, what files need updating?"
-            Returns each call site with file path and line number.
+            USE THIS TOOL WHEN the user asks:
+            - "what breaks / is affected / needs updating if I change X"
+            - "if I swap / replace / migrate X to Y, what do I need to touch"
+            - "where are all the places affected by changing X"
+            - "do I need to update each <thing> if I change <component>"
+            - "I need to change X — what's the blast radius"
+            - "what uses X", "what depends on X", "safe to remove X"
+            - any rename, delete, refactor, migration, or swap question
+
+            After getting results, read impacted files only if you need
+            implementation details to answer the user's question.
 
             Args:
-                function_name: The name of the function to find callers for
+                node_name: Name of the function, class, or module (e.g.,
+                           "AuthMiddleware", "Message", "CognitoTokenVerifier").
+            """
+            return query_tools.trace_impact(self._get_graph(), node_name)
+
+        @self.mcp.tool()
+        def find_callers(function_name: str) -> dict:
+            """
+            Call sites of a function (file + line). Use when you only need
+            callers; for full impact (callers + importers) prefer trace_impact.
+
+            USE THIS TOOL WHEN the user asks:
+            - "who calls X", "callers of X"
+            - "where is X invoked" (when you only need call sites, not imports)
+
+            Args:
+                function_name: The function name to look up.
             """
             return query_tools.find_callers(self._get_graph(), function_name)
 
         @self.mcp.tool()
         def find_dependencies(node_name: str) -> dict:
             """
-            Find everything a module, class, or function depends on.
+            What a module, class, or function depends on, grouped by relationship
+            (CALLS, IMPORTS, INHERITS). Shows the full dependency tree downward.
 
-            Use this to answer: "What does X depend on?" or "What do I need to
-            understand before modifying X?"
-            Returns dependencies grouped by relationship type (CALLS, IMPORTS, etc.)
+            USE THIS TOOL WHEN the user asks:
+            - "what does X depend on", "what does X use internally"
+            - "what do I need to understand before changing X"
+            - onboarding to unfamiliar code or agent
+
+            KEY WORKFLOW — test plan generation:
+            When the user asks to build a test plan/suite that captures all
+            conditional logic for an agent or module:
+              1. Call find_dependencies on the agent's entry point to map
+                 everything it calls.
+              2. Call get_branches on each key function/method to enumerate
+                 every branch (if/else, try/catch, etc.).
+              3. Design test cases from the branch map.
 
             Args:
-                node_name: The name of the module, class, or function
+                node_name: Name of the module, class, or function.
             """
             return query_tools.find_dependencies(self._get_graph(), node_name)
 
         @self.mcp.tool()
         def find_importers(module_name: str) -> dict:
             """
-            Find all files that import a given module.
+            Files that import a given module (file + line). Use when you only
+            need importers; for full impact (callers + importers) prefer
+            trace_impact.
 
-            Use this to answer: "What breaks if I remove or rename this module?"
-            Returns each import site with file path and line number.
+            USE THIS TOOL WHEN the user asks:
+            - "what imports X", "what files pull in X"
+            - module rename/move planning
+            - "where is this model/class referenced" (import-level only)
 
             Args:
-                module_name: The name of the module to find importers for
+                module_name: The module name to look up.
             """
             return query_tools.find_importers(self._get_graph(), module_name)
 
         @self.mcp.tool()
-        def trace_impact(node_name: str) -> dict:
-            """
-            Trace the full impact of changing or deleting a node.
-
-            Use this to answer: "What breaks if I change X?"
-            Combines callers and importers for a complete impact picture.
-
-            Args:
-                node_name: The name of the function, class, or module to analyze
-            """
-            return query_tools.trace_impact(self._get_graph(), node_name)
-
-        @self.mcp.tool()
         def graph_stats() -> dict:
             """
-            Return stats about the loaded code graph.
-            Useful for confirming the graph was built successfully.
+            Node/edge counts. Use to confirm the graph loaded correctly.
             """
             return query_tools.get_graph_stats(self._get_graph())
 
         @self.mcp.tool()
-        def update_file(file_path: str) -> dict:
+        def rebuild(file_path: str = "", repo_path: str = "") -> dict:
             """
-            Incrementally update the graph for a single changed file.
+            Rebuild the code graph. If file_path is given, incrementally
+            re-parses that single file (fast). Otherwise does a full rebuild
+            from scratch.
 
-            Removes all existing nodes/edges for the file, re-parses it,
-            and loads the fresh data. Much faster than a full rebuild.
-            Called automatically by the Kiro fileEdited hook.
+            Incremental mode is called automatically by the Kiro fileEdited
+            hook. Full rebuild is useful after git pull, branch switch, or
+            mass rename.
 
             Args:
-                file_path: Absolute or relative path to the changed file
+                file_path: Optional. Absolute or REPO_PATH-relative path to
+                           a single changed file. If given, does incremental
+                           update. If omitted, does full rebuild.
+                repo_path: Optional repo root override (full rebuild only).
+                           Defaults to REPO_PATH env.
             """
+            # Incremental single-file update
+            if file_path:
+                graph = self._get_graph()
+
+                if not os.path.isabs(file_path):
+                    rp = os.getenv("REPO_PATH", ".")
+                    file_path = os.path.join(rp, file_path)
+
+                if not os.path.exists(file_path):
+                    return {"status": "skipped", "reason": f"File not found: {file_path}"}
+
+                graph.remove_file(file_path)
+                result = parse_file(file_path)
+                graph.load(result.nodes, result.edges)
+                invalidate_cache(os.getenv("REPO_PATH", "."))
+
+                return {
+                    "status": "updated",
+                    "file": file_path,
+                    "nodes_added": len(result.nodes),
+                    "edges_added": len(result.edges),
+                    **query_tools.get_graph_stats(graph),
+                }
+
+            # Full rebuild
+            if repo_path:
+                os.environ["REPO_PATH"] = repo_path
+            self._graph = None
             graph = self._get_graph()
-
-            # Resolve to absolute path
-            if not os.path.isabs(file_path):
-                repo_path = os.getenv("REPO_PATH", ".")
-                file_path = os.path.join(repo_path, file_path)
-
-            if not os.path.exists(file_path):
-                return {"status": "skipped", "reason": f"File not found: {file_path}"}
-
-            # Remove stale nodes for this file, re-parse, reload
-            graph.remove_file(file_path)
-            result = parse_file(file_path)
-            graph.load(result.nodes, result.edges)
-
-            # Rebuilding a minimal ParseResult snapshot isn't practical here,
-            # so invalidate the cache so the next restart does a clean rebuild.
-            repo_path = os.getenv("REPO_PATH", ".")
-            invalidate_cache(repo_path)
-
             return {
-                "status": "updated",
-                "file": file_path,
-                "nodes_added": len(result.nodes),
-                "edges_added": len(result.edges),
+                "status": "rebuilt",
+                "repo_path": os.getenv("REPO_PATH", "."),
                 **query_tools.get_graph_stats(graph),
             }
 
         @self.mcp.tool()
         def run_query(code: str) -> dict:
             """
-            Run a custom Python query against the code graph.
+            Execute custom Python against the graph for questions the other
+            tools don't cover (rankings, aggregations, custom traversals).
 
-            The graph is exposed as `G` (a NetworkX MultiDiGraph) and `idx`
-            (the name index: dict[str, list[node_id]]).
+            USE THIS TOOL WHEN the user asks:
+            - "top N most-called functions", "most complex modules"
+            - "all classes inheriting from X"
+            - "find all functions matching pattern"
+            - any aggregate, ranking, or custom graph traversal query
 
-            Node attributes: name, node_type, file, line, language
-            Edge attributes: edge_type ("CALLS" | "IMPORTS" | "INHERITS"), file, line
-            node_type values: "Function", "Class", "Module", "External"
+            Scope available: `G` (NetworkX MultiDiGraph), `idx`
+            (dict[name, list[node_id]]), `collections`, `itertools`.
+            Node attrs: name, node_type, file, line, language.
+            Edge attrs: edge_type ("CALLS" | "IMPORTS" | "INHERITS"), file, line.
+            node_type values: "Function", "Class", "Module", "External".
 
-            Your code must assign the result to a variable named `result`.
+            Must assign output to `result`.
 
-            Available in scope: G, idx, collections, itertools
-
-            Examples
-            --------
-            # Top 10 most-called functions (excluding builtins/externals)
-            counts = collections.Counter()
-            for u, v, d in G.edges(data=True):
-                if d["edge_type"] == "CALLS" and not v.startswith("external::"):
-                    counts[G.nodes[v].get("name")] += 1
-            result = counts.most_common(10)
-
-            # All classes that inherit from BaseModel
-            result = [
-                (G.nodes[v].get("name"), G.nodes[v].get("file"))
-                for u, v, d in G.edges(data=True)
-                if d["edge_type"] == "INHERITS" and G.nodes[u].get("name") == "BaseModel"
-            ]
+            Example — top 10 most-called functions:
+                counts = collections.Counter()
+                for u, v, d in G.edges(data=True):
+                    if d["edge_type"] == "CALLS" and not v.startswith("external::"):
+                        counts[G.nodes[v].get("name")] += 1
+                result = counts.most_common(10)
 
             Args:
-                code: Python code to execute. Must assign output to `result`.
+                code: Python code. Imports, deletes, exec/eval/open are blocked.
             """
             import collections as _collections
             import itertools as _itertools
@@ -258,46 +349,63 @@ class CodeGraphMCPServer:
                 return {"result": str(raw)}
 
         @self.mcp.tool()
-        def extract_file_branches(
-            file_path: str,
+        def get_branches(
             scope: str = "",
+            file_path: str = "",
+            walk: bool = False,
         ) -> dict:
             """
-            Extract all branch points from a source file.
+            Branch map (if/elif/else, try/catch, switch/case, match/case,
+            ternary) with cyclomatic complexity.
 
-            Supports Python, TypeScript, JavaScript, and Java. Uses the same
-            tree-sitter parser as the code graph — no extra dependencies.
+            Modes:
+              - scope only              → single function, graph lookup (fast)
+              - scope + walk=True       → BFS from entry point, collects branches
+                                          across every reachable function
+              - file_path only          → fresh parse of the whole file
+              - scope + file_path       → fresh parse, scoped to function
+              - scope misses the graph  → falls back to parsing file_path
+                                          if given, else returns found=False
 
-            Enumerates every decision point: if/elif/else, try/catch/finally,
-            switch/case, match/case (Python 3.10+), and ternary expressions.
-            Each branch is annotated with its line number, enclosing
-            function/class, condition text, and a summary of each arm.
-
-            Use this to answer:
-              - "What are all the conditional paths through this function?"
-                (test generation — get the full branch map before writing tests)
-              - "What branches changed in this file?"
-                (code review — surface all conditional logic in a diff)
-              - "How complex is this module?"
-                (refactoring — cyclomatic_complexity ranks files for cleanup)
-              - "Are there bare catch blocks or auth-bypass conditions?"
-                (security audit — find risky patterns across the codebase)
-              - "What edge cases should the docstring mention?"
-                (documentation — auto-generate edge-case sections)
+            USE THIS TOOL WHEN the user asks:
+            - "what branches / conditional logic does X have"
+            - "build a test plan/suite that captures all conditional logic"
+            - "what's the total complexity of this subsystem" (use walk=True)
+            - "map all conditional logic reachable from X" (use walk=True)
+            - "scope a migration — how complex is this call chain" (walk=True)
+            - cyclomatic complexity, code review of conditionals
 
             Args:
-                file_path: Path to the source file (absolute, or relative to
-                           the repo root set in REPO_PATH env var).
-                scope: Optional function or class name to restrict analysis to.
-                       Supports dotted names like "MyClass.myMethod".
-                       Leave empty to analyse the entire file.
+                scope: Function/method, optionally dotted: "AuthMiddleware.dispatch".
+                file_path: Absolute or REPO_PATH-relative path. Required if
+                           scope isn't given or isn't in the graph.
+                walk: If True, BFS from scope as entry point and collect
+                      branches across all reachable functions. Ignores file_path.
 
             Returns:
-                Dict with language, total_branches, cyclomatic_complexity, and
-                a branches list. Each branch has: branch_type, line,
-                enclosing_scope, condition, description, and arms (each arm
-                has kind, condition, line, body_summary).
+                source ("graph" | "parse" | "walk"), file, language,
+                total_branches, cyclomatic_complexity, branches[], summary.
             """
+            if not scope and not file_path:
+                return {
+                    "found": False,
+                    "error": "Provide `scope`, `file_path`, or both.",
+                }
+
+            # Walk mode: BFS from entry point
+            if walk and scope:
+                result = query_tools.walk_branches(self._get_graph(), scope)
+                return {"source": "walk", **result}
+
+            # Fast path: graph lookup when a scope is given
+            if scope:
+                graph_result = query_tools.get_branches(self._get_graph(), scope)
+                if graph_result.get("found"):
+                    return {"source": "graph", **graph_result}
+                if not file_path:
+                    return graph_result
+
+            # Fresh parse path
             if file_path and not os.path.isabs(file_path):
                 repo_path = os.getenv("REPO_PATH", ".")
                 file_path = os.path.join(repo_path, file_path)
@@ -306,26 +414,7 @@ class CodeGraphMCPServer:
                 file_path=file_path,
                 scope=scope if scope else None,
             )
-            return branch_report_to_dict(report)
-
-        @self.mcp.tool()
-        def rebuild_graph(repo_path: str = "") -> dict:
-            """
-            Rebuild the code graph from the given repo path (or REPO_PATH env var).
-            Use this after significant code changes to refresh the graph.
-
-            Args:
-                repo_path: Optional path to the repo root. Defaults to REPO_PATH env var.
-            """
-            if repo_path:
-                os.environ["REPO_PATH"] = repo_path
-            self._graph = None  # force rebuild on next query
-            graph = self._get_graph()  # rebuilds and saves cache automatically
-            return {
-                "status": "rebuilt",
-                "repo_path": os.getenv("REPO_PATH", "."),
-                **query_tools.get_graph_stats(graph),
-            }
+            return {"source": "parse", **branch_report_to_dict(report)}
 
     def get_server(self) -> FastMCP:
         return self.mcp

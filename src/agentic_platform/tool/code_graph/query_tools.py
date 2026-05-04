@@ -207,3 +207,201 @@ def get_graph_stats(graph: GraphStore) -> dict:
         "edge_count": graph.edge_count(),
         "summary": f"Graph contains {graph.node_count()} nodes and {graph.edge_count()} edges.",
     }
+
+
+def get_branches(graph: GraphStore, scope: str) -> dict:
+    """
+    Return branch data for a function or method from the graph.
+
+    Branch data is extracted at graph build time and stored as node metadata,
+    so this is a pure graph lookup — no file I/O or re-parsing.
+
+    Args:
+        graph: The loaded graph store
+        scope: Function or method name, optionally dotted: "MyClass.my_method"
+
+    Returns:
+        Dict with branches, cyclomatic_complexity, and summary
+    """
+    result = graph.find_branches(scope)
+
+    if not result:
+        return {
+            "scope": scope,
+            "found": False,
+            "summary": (
+                f"No branch data found for '{scope}'. "
+                "The function may not exist, have no branches, or the graph "
+                "may need to be rebuilt with 'rebuild_graph'."
+            ),
+        }
+
+    branches = result["branches"]
+    complexity = result["cyclomatic_complexity"]
+
+    by_type: dict[str, int] = {}
+    for b in branches:
+        by_type[b["branch_type"]] = by_type.get(b["branch_type"], 0) + 1
+    type_summary = ", ".join(f"{count} {t}" for t, count in sorted(by_type.items()))
+
+    return {
+        "scope": scope,
+        "found": True,
+        "file": result["file"],
+        "line": result["line"],
+        "language": result["language"],
+        "total_branches": len(branches),
+        "cyclomatic_complexity": complexity,
+        "branches": branches,
+        "summary": (
+            f"'{scope}' has {len(branches)} branch point(s) "
+            f"(cyclomatic complexity: {complexity})"
+            + (f" — {type_summary}" if type_summary else "")
+        ),
+    }
+
+
+def walk_branches(graph: GraphStore, entry_point: str) -> dict:
+    """
+    Walk the call graph from an entry point via BFS and collect all branch
+    metadata across every reachable function.
+
+    Use cases:
+      - Test planning: map every conditional path that tests should cover
+      - Migration scoping: understand the full complexity of a subsystem
+        before and after conversion
+      - Complexity audit: find total cyclomatic complexity reachable from
+        an entry point
+      - Code review: see all conditional logic in a feature's call chain
+
+    Args:
+        graph: The loaded graph store
+        entry_point: Module, class, or function name to start from
+                     (e.g. "jira_agent", "StrandsJiraAgent", "server")
+
+    Returns:
+        Dict with entry_point, functions with branches, total branch count,
+        and a per-function breakdown.
+    """
+    # Find the entry point node(s)
+    node = graph.find_node(entry_point)
+    if not node:
+        return {
+            "entry_point": entry_point,
+            "found": False,
+            "summary": f"'{entry_point}' was not found in the graph.",
+        }
+
+    # Collect all reachable internal functions via BFS on CALLS/DEFINES/IMPORTS edges
+    WALK_EDGE_TYPES = {"CALLS", "DEFINES", "IMPORTS"}
+    visited: set[str] = set()
+    queue = [node["id"]]
+    function_nodes: list[dict] = []
+
+    while queue:
+        nid = queue.pop(0)
+        if nid in visited:
+            continue
+        visited.add(nid)
+
+        nd = graph._graph.nodes.get(nid)
+        if not nd:
+            continue
+
+        # Skip external nodes
+        if nid.startswith("external::"):
+            continue
+
+        # Collect this node if it's a function/method/class
+        if nd.get("node_type") in ("Function", "Method", "Class", "Module"):
+            function_nodes.append({"id": nid, **nd})
+
+        # Walk outgoing CALLS, DEFINES, and IMPORTS edges
+        for _, child_id, data in graph._graph.out_edges(nid, data=True):
+            if data.get("edge_type") in WALK_EDGE_TYPES:
+                if child_id not in visited:
+                    queue.append(child_id)
+
+    # For each function node, collect branch data
+    functions_with_branches = []
+    total_branches = 0
+    total_complexity = 0
+
+    for fn in function_nodes:
+        if fn.get("node_type") not in ("Function", "Method"):
+            continue
+        branch_result = graph.find_branches(fn["name"])
+        if branch_result:
+            entry = {
+                "name": fn["name"],
+                "file": fn.get("file", ""),
+                "line": fn.get("line", 0),
+                "total_branches": branch_result["total_branches"],
+                "cyclomatic_complexity": branch_result["cyclomatic_complexity"],
+                "branches": branch_result["branches"],
+            }
+            functions_with_branches.append(entry)
+            total_branches += branch_result["total_branches"]
+            total_complexity += branch_result["cyclomatic_complexity"]
+
+    # Deduplicate by file+name (same function reached via multiple paths)
+    seen = set()
+    deduped = []
+    for fn in functions_with_branches:
+        key = (fn["file"], fn["name"], fn["line"])
+        if key not in seen:
+            seen.add(key)
+            deduped.append(fn)
+    functions_with_branches = deduped
+
+    # Recalculate totals after dedup
+    total_branches = sum(f["total_branches"] for f in functions_with_branches)
+    total_complexity = sum(f["cyclomatic_complexity"] for f in functions_with_branches)
+
+    # P2: Diagnostics when walk finds 0 functions with branches
+    diagnostic = None
+    if not functions_with_branches:
+        out_edges = [(graph._graph.nodes.get(v, {}).get("name", v),
+                      d.get("edge_type"))
+                     for _, v, d in graph._graph.out_edges(node["id"], data=True)]
+        edge_counts = {}
+        for _, et in out_edges:
+            edge_counts[et] = edge_counts.get(et, 0) + 1
+        internal_targets = [name for name, et in out_edges
+                            if et in WALK_EDGE_TYPES and not name.startswith("external::")]
+        diagnostic = (
+            f"Entry point '{entry_point}' has {len(out_edges)} outgoing edge(s) "
+            f"(types: {edge_counts}) but walk reached 0 functions with branches. "
+            f"Internal targets reachable: {internal_targets[:10]}. "
+            f"Nodes visited: {len(visited)}. "
+            "If this is unexpected, try rebuilding the graph or using file_path fallback."
+        )
+
+    # P3: Flag decorated functions (e.g. @tool, @app.post) in output
+    for fn in functions_with_branches:
+        fn_node_id = None
+        for fnode in function_nodes:
+            if fnode.get("name") == fn["name"] and fnode.get("file") == fn["file"]:
+                fn_node_id = fnode.get("id")
+                break
+        if fn_node_id:
+            decorators = graph._graph.nodes.get(fn_node_id, {}).get("metadata", {}).get("decorators", [])
+            if decorators:
+                fn["decorators"] = decorators
+
+    result = {
+        "entry_point": entry_point,
+        "found": True,
+        "entry_file": node.get("file", ""),
+        "functions_analyzed": len(functions_with_branches),
+        "total_branches": total_branches,
+        "total_cyclomatic_complexity": total_complexity,
+        "functions": functions_with_branches,
+        "summary": (
+            f"Walk from '{entry_point}': {len(functions_with_branches)} function(s) "
+            f"with {total_branches} branch point(s), total cyclomatic complexity {total_complexity}."
+        ),
+    }
+    if diagnostic:
+        result["diagnostic"] = diagnostic
+    return result

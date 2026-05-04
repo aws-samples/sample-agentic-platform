@@ -6,6 +6,9 @@ Supports Python, TypeScript, Java, and Terraform (HCL) via per-language adapters
 Each adapter is a thin layer (~20-30 lines) that maps tree-sitter AST node types
 to our canonical graph model. Adding a new language = adding a new adapter.
 
+Branch data is extracted in the same parse pass and stored as metadata on
+Function/Method nodes, so the graph build is a single tree-sitter walk per file.
+
 Scale note: For very large repos, this module can be parallelized by directory/module.
 At AWS scale, consider running this as a Lambda or Fargate task triggered by S3 events.
 """
@@ -104,6 +107,12 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
             if name_node:
                 name = source[name_node.start_byte:name_node.end_byte]
                 node_id = f"{file_path}::{name}::Function"
+                # Capture decorators from parent decorated_definition
+                decorators = []
+                if node.parent and node.parent.type == "decorated_definition":
+                    for sib in node.parent.children:
+                        if sib.type == "decorator":
+                            decorators.append(source[sib.start_byte:sib.end_byte].lstrip("@").strip())
                 result.nodes.append(GraphNode(
                     id=node_id,
                     name=name,
@@ -111,6 +120,7 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
                     file=file_path,
                     line=node.start_point[0] + 1,
                     language="python",
+                    metadata={"decorators": decorators} if decorators else {},
                 ))
                 if parent_id:
                     result.edges.append(GraphEdge(
@@ -137,6 +147,15 @@ def _parse_python(source: str, file_path: str) -> ParseResult:
                     line=node.start_point[0] + 1,
                     language="python",
                 ))
+                # DEFINES edge from parent (module or enclosing class) to this class
+                if parent_id:
+                    result.edges.append(GraphEdge(
+                        source_id=parent_id,
+                        target_name=name,
+                        edge_type="DEFINES",
+                        file=file_path,
+                        line=node.start_point[0] + 1,
+                    ))
                 # Inheritance edges
                 bases = node.child_by_field_name("superclasses")
                 if bases:
@@ -465,7 +484,15 @@ _ADAPTERS = {
 
 
 def parse_file(file_path: str) -> ParseResult:
-    """Parse a single source file into graph nodes and edges."""
+    """Parse a single source file into graph nodes and edges.
+
+    Runs the branch extractor in the same call so branch data is stored
+    as metadata on Function/Method nodes — no second tree-sitter pass needed.
+    """
+    from agentic_platform.tool.code_graph.branch_extractor import (
+        extract_branches, branch_report_to_dict
+    )
+
     path = Path(file_path)
     language = EXTENSION_TO_LANGUAGE.get(path.suffix.lower())
 
@@ -480,10 +507,46 @@ def parse_file(file_path: str) -> ParseResult:
 
     try:
         source = path.read_text(encoding="utf-8", errors="ignore")
-        return adapter(source, str(file_path))
+        result = adapter(source, str(file_path))
     except Exception as e:
         logger.warning("Failed to parse %s: %s", file_path, e)
         return ParseResult()
+
+    # Extract branches and attach to the matching Function/Method nodes.
+    # extract_branches re-uses the same tree-sitter grammar already loaded
+    # by the adapter above, so the overhead is a second CST walk — one
+    # file at a time, amortised across the full repo build.
+    try:
+        branch_report = extract_branches(file_path)
+        if branch_report.branches:
+            # Index branches by enclosing_scope for O(1) lookup
+            by_scope: dict[str, list] = {}
+            for b in branch_report_to_dict(branch_report)["branches"]:
+                scope = b["enclosing_scope"]
+                by_scope.setdefault(scope, []).append(b)
+
+            for node in result.nodes:
+                if node.node_type in ("Function", "Method"):
+                    # Match on the last component of the scope path
+                    # e.g. node.name "invoke" matches scope "StrandsJiraAgent.invoke"
+                    node_branches = []
+                    for scope, branches in by_scope.items():
+                        scope_leaf = scope.split(".")[-1]
+                        if scope_leaf == node.name:
+                            node_branches.extend(branches)
+                    if node_branches:
+                        node.metadata["branches"] = node_branches
+                        node.metadata["cyclomatic_complexity"] = (
+                            sum(
+                                sum(1 for a in b["arms"]
+                                    if a["kind"] in ("if", "elif", "except", "catch", "case"))
+                                for b in node_branches
+                            ) + 1
+                        )
+    except Exception as e:
+        logger.warning("Branch extraction failed for %s: %s", file_path, e)
+
+    return result
 
 
 def parse_directory(root_dir: str, exclude_dirs: Optional[list[str]] = None) -> ParseResult:
