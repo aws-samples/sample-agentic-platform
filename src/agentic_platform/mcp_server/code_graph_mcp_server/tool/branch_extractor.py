@@ -23,7 +23,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Re-use the language/extension map from the parser so they stay in sync
-from agentic_platform.tool.code_graph.parser import EXTENSION_TO_LANGUAGE, _get_parser
+from agentic_platform.mcp_server.code_graph_mcp_server.tool.parser import EXTENSION_TO_LANGUAGE, _get_parser
 
 
 # ---------------------------------------------------------------------------

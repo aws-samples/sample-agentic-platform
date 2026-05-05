@@ -43,11 +43,11 @@ import json
 import logging
 import os
 from mcp.server.fastmcp import FastMCP
-from agentic_platform.tool.code_graph.cache import is_cache_valid, load_cache, save_cache, invalidate_cache
-from agentic_platform.tool.code_graph.parser import parse_directory, parse_file
-from agentic_platform.tool.code_graph.graph import create_graph_store
-from agentic_platform.tool.code_graph import query_tools
-from agentic_platform.tool.code_graph.branch_extractor import extract_branches, branch_report_to_dict
+from agentic_platform.mcp_server.code_graph_mcp_server.tool.cache import is_cache_valid, load_cache, save_cache, invalidate_cache
+from agentic_platform.mcp_server.code_graph_mcp_server.tool.parser import parse_directory, parse_file
+from agentic_platform.mcp_server.code_graph_mcp_server.tool.graph import create_graph_store
+from agentic_platform.mcp_server.code_graph_mcp_server.tool import query_tools
+from agentic_platform.mcp_server.code_graph_mcp_server.tool.branch_extractor import extract_branches, branch_report_to_dict
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

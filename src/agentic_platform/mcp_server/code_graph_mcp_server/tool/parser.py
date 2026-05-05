@@ -503,7 +503,7 @@ def parse_file(file_path: str) -> ParseResult:
     Runs the branch extractor in the same call so branch data is stored
     as metadata on Function/Method nodes — no second tree-sitter pass needed.
     """
-    from agentic_platform.tool.code_graph.branch_extractor import (
+    from agentic_platform.mcp_server.code_graph_mcp_server.tool.branch_extractor import (
         extract_branches, branch_report_to_dict
     )
 
