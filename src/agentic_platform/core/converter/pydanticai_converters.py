@@ -140,7 +140,7 @@ class PydanticAIStreamingEventConverter:
                         }
                     ))
         
-        # Handle final data/output - this should be TextDoneEvent since it's the final complete response
+        # Handle final data/output - emit a final TextDeltaEvent (with is_final metadata) followed by DoneEvent
         elif 'data' in event and event['data'].get('output'):
             events.append(TextDeltaEvent(
                 session_id=session_id,
