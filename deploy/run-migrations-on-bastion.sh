@@ -21,7 +21,7 @@ fi
 # Get the configuration from SSM Parameter Store
 echo "🔍 Retrieving configuration from Parameter Store..."
 CONFIG_JSON=$(aws ssm get-parameter \
-    --name "/agentic-platform/config/dev" \
+    --name "/agentic-platform/config/agentcore-dev" \
     --with-decryption \
     --query 'Parameter.Value' \
     --output text)

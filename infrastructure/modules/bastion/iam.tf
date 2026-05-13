@@ -237,6 +237,38 @@ resource "aws_iam_role_policy_attachment" "bastion_redis_attachment" {
   role       = aws_iam_role.bastion_role.name
 }
 
+# SSM Parameter Store read policy for bastion
+resource "aws_iam_policy" "ssm_parameter_bastion_policy" {
+  name        = "${var.name_prefix}ssm-parameter-bastion-policy"
+  description = "Policy to allow reading SSM Parameter Store values from bastion"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
+          "ssm:DescribeParameters"
+        ]
+        Resource = [
+          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/agentic-platform/*"
+        ]
+      }
+    ]
+  })
+
+  tags = var.common_tags
+}
+
+# Attach the SSM Parameter Store policy to the bastion role
+resource "aws_iam_role_policy_attachment" "bastion_ssm_parameter_attachment" {
+  policy_arn = aws_iam_policy.ssm_parameter_bastion_policy.arn
+  role       = aws_iam_role.bastion_role.name
+}
+
 # ECR policy for the bastion host with least privilege
 resource "aws_iam_policy" "ecr_bastion_policy" {
   name        = "${var.name_prefix}ecr-bastion-policy"
