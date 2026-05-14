@@ -56,17 +56,10 @@ def main():
                 nova_act_api_key=os.environ["NOVA_ACT_API_KEY"],
                 starting_page=starting_url,
             ) as nova_act:
-                result = nova_act.act(prompt=request, max_steps=20)
+                # act_get() preserves the response field; act() erases it via .without_response()
+                result = nova_act.act_get(prompt=request, max_steps=20)
 
-                result_text = None
-                if hasattr(result, "return_value"):
-                    result_text = str(result.return_value)
-                elif hasattr(result, "value"):
-                    result_text = str(result.value)
-                elif hasattr(result, "output"):
-                    result_text = str(result.output)
-                else:
-                    result_text = str(result)
+                result_text = result.response if result.response else str(result)
 
                 prompt_text = (
                     str(result.metadata.prompt)
