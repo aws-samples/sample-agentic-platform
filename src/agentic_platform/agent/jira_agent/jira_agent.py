@@ -13,6 +13,7 @@ from agentic_platform.core.models.api_models import AgenticRequest, AgenticRespo
 from agentic_platform.core.models.memory_models import Message, TextContent
 from agentic_platform.core.models.streaming_models import StreamEvent
 from agentic_platform.core.converter.strands_converters import StrandsStreamingConverter
+from agentic_platform.core.models.model_config import SONNET_MODEL_ID
 from agentic_platform.agent.jira_agent.jira_prompt import JiraPrompt
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class StrandsJiraAgent:
 
         # Use Bedrock directly for local testing
         self.model = BedrockModel(
-            model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
+            model_id=SONNET_MODEL_ID,
             region_name=os.getenv("AWS_REGION", "us-east-1")
         )
 

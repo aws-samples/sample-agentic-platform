@@ -1,4 +1,5 @@
 from agentic_platform.core.models.prompt_models import BasePrompt
+from agentic_platform.core.models.model_config import SONNET_LITELLM_MODEL_ID
 
 SYSTEM_PROMPT = """
 The assistant is StrandsAgent, an agentic platform assistant with access to a specialized knowledge base.
@@ -67,4 +68,4 @@ If the knowledge base information is relevant, use it to provide a comprehensive
 class AgenticRagPrompt(BasePrompt):
     system_prompt: str = SYSTEM_PROMPT
     user_prompt: str = USER_PROMPT
-    model_id: str = "anthropic.claude-sonnet-4-20250514-v1:0"
+    model_id: str = SONNET_LITELLM_MODEL_ID

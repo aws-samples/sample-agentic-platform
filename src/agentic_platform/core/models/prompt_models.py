@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 
-HAIKU_MODEL_ID = "us.anthropic.claude-3-haiku-20240307-v1:0"
+from agentic_platform.core.models.model_config import HAIKU_LITELLM_MODEL_ID
 class BasePrompt(BaseModel):
     """
     A streamlined base class for creating prompts with system and user components.
@@ -9,7 +9,7 @@ class BasePrompt(BaseModel):
     system_prompt: str
     user_prompt: str    
     inputs: Dict[str, Any] = Field(default_factory=dict)
-    model_id: str = HAIKU_MODEL_ID
+    model_id: str = HAIKU_LITELLM_MODEL_ID
     hyperparams: Dict[str, Any] = Field(default_factory=lambda: {
         "temperature": 0.5,
         "maxTokens": 1000

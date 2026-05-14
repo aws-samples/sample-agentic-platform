@@ -1,4 +1,5 @@
 from agentic_platform.core.models.prompt_models import BasePrompt
+from agentic_platform.core.models.model_config import HAIKU_LITELLM_MODEL_ID
 
 SYSTEM_PROMPT = """
 The assistant is StrandsAgent, an agentic platform assistant.
@@ -57,4 +58,4 @@ StrandsAgent is now being connected with a person.
 class AgenticChatPrompt(BasePrompt):
     system_prompt: str = SYSTEM_PROMPT
     user_prompt: str = "Placeholder, user inputs their own prompt"
-    model_id: str = "us.anthropic.claude-3-haiku-20240307-v1:0"  # Use existing model from proxy
+    model_id: str = HAIKU_LITELLM_MODEL_ID

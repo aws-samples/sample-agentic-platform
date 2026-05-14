@@ -13,6 +13,7 @@ from agentic_platform.core.models.streaming_models import StreamEvent
 from agentic_platform.core.converter.strands_converters import StrandsStreamingConverter
 from agentic_platform.core.client.llm_gateway.llm_gateway_client import LLMGatewayClient, LiteLLMClientInfo
 from agentic_platform.agent.agentic_rag.prompt.agentic_rag_prompt import AgenticRagPrompt
+from agentic_platform.core.models.model_config import SONNET_LITELLM_MODEL_ID
 from agentic_platform.agent.agentic_rag.tool.kb_tool import search_knowledge_base
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class StrandsAgenticRagAgent:
         litellm_info: LiteLLMClientInfo = LLMGatewayClient.get_client_info()
 
         self.model = OpenAIModel(
-            model_id="anthropic.claude-sonnet-4-20250514-v1:0",
+            model_id=SONNET_LITELLM_MODEL_ID,
             client_args={
                 "api_key": litellm_info.api_key,
                 "base_url": litellm_info.api_endpoint,
