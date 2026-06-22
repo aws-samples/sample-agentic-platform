@@ -1,0 +1,67 @@
+{
+  "family": "atx-test-runner",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/atx-test-runner-task-role",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/atx-test-runner-execution-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "containerDefinitions": [
+    {
+      "name": "atx-test-runner",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/atx-test-runner:VERSION",
+      "essential": true,
+      "command": [
+        "/usr/local/bin/atx-orchestrator.sh",
+        "--csv-file",
+        "/config/repos.csv",
+        "--mode",
+        "parallel",
+        "--max-jobs",
+        "4"
+      ],
+      "environment": [
+        {
+          "name": "AWS_DEFAULT_REGION",
+          "value": "us-east-1"
+        },
+        {
+          "name": "ATX_LOG_LEVEL",
+          "value": "INFO"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/atx-test-runner",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "atx"
+        }
+      },
+      "mountPoints": [],
+      "volumesFrom": [],
+      "portMappings": [],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "test -f /tmp/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ],
+  "volumes": [],
+  "tags": [
+    {
+      "key": "Application",
+      "value": "ATX-Test-Runner"
+    },
+    {
+      "key": "Environment",
+      "value": "Production"
+    }
+  ]
+}

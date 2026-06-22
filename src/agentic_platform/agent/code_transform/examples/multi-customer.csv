@@ -1,0 +1,12 @@
+# Example: Multiple Customers with Various Folder Structures
+# Use case: Processing code from multiple customers in a single batch
+# This demonstrates handling different customers with different folder organizations
+
+s3_path,build_command,transformation_name,output_s3_path
+s3://source-bucket/customer-alpha/main-app/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer-alpha/main-app/
+s3://source-bucket/customer-alpha/reports/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer-alpha/reports/
+s3://source-bucket/customer-beta/core/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer-beta/core/
+s3://source-bucket/customer-beta/modules/billing/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer-beta/modules/billing/
+s3://source-bucket/customer-beta/modules/crm/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer-beta/modules/crm/
+s3://source-bucket/customer-gamma/legacy/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer-gamma/legacy/
+s3://source-bucket/customer-gamma/modernized/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer-gamma/modernized/

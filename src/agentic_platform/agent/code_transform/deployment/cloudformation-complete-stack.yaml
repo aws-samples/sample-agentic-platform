@@ -1,0 +1,384 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Complete ATX Test Runner infrastructure including VPC, ECS Cluster, Task Definition, and IAM roles'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name for resource tagging
+    AllowedValues:
+      - development
+      - staging
+      - production
+
+  ImageVersion:
+    Type: String
+    Default: latest
+    Description: Docker image version tag
+
+  SourceBucketName:
+    Type: String
+    Description: S3 bucket containing source code folders
+
+  ResultsBucketName:
+    Type: String
+    Description: S3 bucket for storing transformation results
+
+  VpcCIDR:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC
+
+  PublicSubnet1CIDR:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: CIDR block for public subnet 1
+
+  PublicSubnet2CIDR:
+    Type: String
+    Default: 10.0.2.0/24
+    Description: CIDR block for public subnet 2
+
+  MaxParallelJobs:
+    Type: Number
+    Default: 4
+    MinValue: 1
+    MaxValue: 10
+    Description: Maximum number of parallel transformation jobs
+
+  TaskCpu:
+    Type: String
+    Default: '2048'
+    AllowedValues: ['256', '512', '1024', '2048', '4096']
+    Description: CPU units for ECS task (1024 = 1 vCPU)
+
+  TaskMemory:
+    Type: String
+    Default: '4096'
+    AllowedValues: ['512', '1024', '2048', '4096', '8192', '16384']
+    Description: Memory for ECS task in MB
+
+Resources:
+  # VPC and Networking
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-igw
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-public-subnet-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-public-subnet-2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-public-routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  # Security Group
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-atx-ecs-sg
+      GroupDescription: Security group for ATX Test Runner ECS tasks
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-ecs-sg
+
+  # IAM Roles
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-atx-execution-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-execution-role
+
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-atx-task-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${SourceBucketName}
+                  - !Sub arn:aws:s3:::${SourceBucketName}/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${ResultsBucketName}
+                  - !Sub arn:aws:s3:::${ResultsBucketName}/*
+        - PolicyName: ATXTransformAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - transform-custom:*
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:ListFoundationModels
+                  - bedrock:GetFoundationModel
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/atx/*"
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-task-role
+
+  # CloudWatch Log Group
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${EnvironmentName}-atx-test-runner
+      RetentionInDays: 30
+
+  # ECS Cluster
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${EnvironmentName}-atx-cluster
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+        - CapacityProvider: FARGATE_SPOT
+          Weight: 4
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-cluster
+
+  # ECS Task Definition
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${EnvironmentName}-atx-test-runner
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: atx-test-runner
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/atx-test-runner:${ImageVersion}
+          Essential: true
+          Command:
+            - --csv-file
+            - s3://atx-test-source-438227048955/sample-repos.csv
+            - --mode
+            - serial
+            - --verbose
+          Environment:
+            - Name: AWS_DEFAULT_REGION
+              Value: !Ref AWS::Region
+            - Name: ATX_LOG_LEVEL
+              Value: INFO
+            - Name: SOURCE_BUCKET
+              Value: !Ref SourceBucketName
+            - Name: RESULTS_BUCKET
+              Value: !Ref ResultsBucketName
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: atx
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-atx-task-definition
+
+  # ECR Repository
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: atx-test-runner
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      Tags:
+        - Key: Name
+          Value: atx-test-runner-ecr
+
+Outputs:
+  ClusterName:
+    Description: ECS Cluster Name
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-cluster-name
+
+  TaskDefinitionArn:
+    Description: Task Definition ARN
+    Value: !Ref TaskDefinition
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-task-definition-arn
+
+  TaskRoleArn:
+    Description: Task Role ARN
+    Value: !GetAtt ECSTaskRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-task-role-arn
+
+  ExecutionRoleArn:
+    Description: Execution Role ARN
+    Value: !GetAtt ECSTaskExecutionRole.Arn
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-execution-role-arn
+
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !Ref ECSSecurityGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-security-group-id
+
+  Subnet1Id:
+    Description: Public Subnet 1 ID
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-subnet-1-id
+
+  Subnet2Id:
+    Description: Public Subnet 2 ID
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-subnet-2-id
+
+  ECRRepositoryUri:
+    Description: ECR Repository URI
+    Value: !GetAtt ECRRepository.RepositoryUri
+    Export:
+      Name: atx-test-runner-ecr-uri
+
+  LogGroupName:
+    Description: CloudWatch Log Group Name
+    Value: !Ref LogGroup
+    Export:
+      Name: !Sub ${EnvironmentName}-atx-log-group-name
+
+  RunTaskCommand:
+    Description: AWS CLI command to run the task
+    Value: !Sub |
+      aws ecs run-task \
+        --cluster ${ECSCluster} \
+        --task-definition ${TaskDefinition} \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[${PublicSubnet1},${PublicSubnet2}],securityGroups=[${ECSSecurityGroup}],assignPublicIp=ENABLED}" \
+        --region ${AWS::Region}

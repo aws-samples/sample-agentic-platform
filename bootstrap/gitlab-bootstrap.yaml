@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  GitLab CI/CD OIDC Integration for AWS ECR
+  
+  This template creates an OIDC identity provider and IAM role that allows GitLab CI/CD 
+  pipelines to authenticate with AWS and push container images to Amazon ECR without 
+  storing long-lived AWS credentials.
+  
+  Resources Created:
+  - OIDC Identity Provider for gitlab.com
+  - IAM Role with web identity federation
+  - IAM Policy with ECR push permissions
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: GitLab Project Configuration
+        Parameters:
+          - GitLabGroup
+          - GitLabProject
+      - Label:
+          default: ECR Configuration
+        Parameters:
+          - ECRRepositoryPrefix
+    ParameterLabels:
+      GitLabGroup:
+        default: GitLab Group/Namespace
+      GitLabProject:
+        default: GitLab Project Name
+      ECRRepositoryPrefix:
+        default: ECR Repository Prefix
+
+Parameters:
+  GitLabGroup:
+    Type: String
+    Description: 'GitLab group or namespace name (e.g., "my-company" from gitlab.com/my-company/my-project)'
+    AllowedPattern: '^[a-zA-Z0-9_.-]+$'
+    ConstraintDescription: 'Must contain only alphanumeric characters, hyphens, underscores, and periods'
+  
+  GitLabProject:
+    Type: String
+    Description: 'GitLab project name (e.g., "my-project" from gitlab.com/my-company/my-project)'
+    AllowedPattern: '^[a-zA-Z0-9_.-]+$'
+    ConstraintDescription: 'Must contain only alphanumeric characters, hyphens, underscores, and periods'
+  
+  ECRRepositoryPrefix:
+    Type: String
+    Description: 'Prefix for ECR repository names to scope permissions. Leave empty to use project name as prefix.'
+    Default: ''
+    AllowedPattern: '^[a-z0-9][a-z0-9_.-]*$|^$'
+    ConstraintDescription: 'Must start with lowercase letter or number, and contain only lowercase letters, numbers, hyphens, underscores, and periods'
+Conditions:
+  HasRepositoryPrefix: !Not [!Equals [!Ref ECRRepositoryPrefix, '']]
+
+Resources:
+  GitLabOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://gitlab.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 7e04de896a3e666be93d4e7d5781e61c4f9f5fb7
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  ECRPushPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W13
+            reason: 'ecr:GetAuthorizationToken requires wildcard resource as per AWS ECR API requirements'
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ECRGetAuthorizationToken
+            Effect: Allow
+            Action:
+              - ecr:GetAuthorizationToken
+            Resource: '*'
+          - Sid: ECRPushPermissions
+            Effect: Allow
+            Action:
+              - ecr:CreateRepository
+              - ecr:DescribeRepositories
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:InitiateLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:CompleteLayerUpload
+              - ecr:PutImage
+            Resource: !If
+              - HasRepositoryPrefix
+              - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${ECRRepositoryPrefix}*'
+              - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${GitLabProject}*'
+
+  GitLabCIRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-GitLabCIRole'
+      Description: !Sub 'IAM role for GitLab CI/CD pipelines from ${GitLabGroup}/${GitLabProject}'
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !GetAtt GitLabOIDCProvider.Arn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                gitlab.com:aud: sts.amazonaws.com
+              StringLike:
+                gitlab.com:sub:
+                  - !Sub 'project_path:${GitLabGroup}/${GitLabProject}:ref_type:branch:ref:main'
+                  - !Sub 'project_path:${GitLabGroup}/${GitLabProject}:ref_type:branch:ref:develop'
+                  - !Sub 'project_path:${GitLabGroup}/${GitLabProject}:ref_type:tag:ref:*'
+                  - !Sub 'project_path:${GitLabGroup}/${GitLabProject}:ref_type:branch:ref:*'
+      ManagedPolicyArns:
+        - !Ref ECRPushPolicy
+      Tags:
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Purpose
+          Value: GitLabCICD
+        - Key: GitLabProject
+          Value: !Sub '${GitLabGroup}/${GitLabProject}'
+
+Outputs:
+  GitLabCIRoleArn:
+    Description: 'ARN of the IAM role for GitLab CI/CD. Add this to your GitLab CI/CD variables as AWS_ROLE_ARN'
+    Value: !GetAtt GitLabCIRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleArn'
+  
+  GitLabCIRoleName:
+    Description: 'Name of the IAM role for GitLab CI/CD'
+    Value: !Ref GitLabCIRole
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleName'
+  
+  OIDCProviderArn:
+    Description: 'ARN of the GitLab OIDC provider'
+    Value: !GetAtt GitLabOIDCProvider.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-OIDCProviderArn'
+  
+  ECRRepositoryPattern:
+    Description: 'ECR repository pattern that this role can access'
+    Value: !If
+      - HasRepositoryPrefix
+      - !Sub '${ECRRepositoryPrefix}*'
+      - !Sub '${GitLabProject}*'
+  
+  NextSteps:
+    Description: 'Configuration instructions'
+    Value: !Sub |
+      1. Add these CI/CD variables in GitLab (Settings > CI/CD > Variables):
+         - AWS_ROLE_ARN: ${GitLabCIRole.Arn}
+         - AWS_REGION: ${AWS::Region}
+         - AWS_ACCOUNT_ID: ${AWS::AccountId}
+      2. Use the provided .gitlab-ci.yml example to test the integration
+      3. Ensure your GitLab project is at: https://gitlab.com/${GitLabGroup}/${GitLabProject}

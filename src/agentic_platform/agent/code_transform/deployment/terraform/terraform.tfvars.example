@@ -1,0 +1,12 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars and update with your values
+
+aws_region          = "us-east-1"
+environment         = "production"
+image_version       = "0.1.0"
+source_bucket_name  = "my-source-bucket"
+results_bucket_name = "my-results-bucket"
+vpc_cidr            = "10.0.0.0/16"
+max_parallel_jobs   = 4
+task_cpu            = "2048"
+task_memory         = "4096"
