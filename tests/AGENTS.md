@@ -74,12 +74,9 @@ tests/
 │   │       └── test_litellm_converters.py
 │   │
 │   ├── agent/                      # Tests for src/agentic_platform/agent/
-│   │   ├── diy_agent/
-│   │   │   ├── test_diy_agent.py           # → agent/diy_agent/agent.py
-│   │   │   └── test_diy_agent_controller.py # → agent/diy_agent/controller.py
-│   │   └── pydanticai_agent/
-│   │       ├── test_pyai_agent.py
-│   │       └── test_pyai_agent_controller.py
+│   │   └── agentic_chat/
+│   │       ├── test_agentic_chat_agent.py      # → agent/agentic_chat/agent/
+│   │       └── test_agentic_chat_controller.py # → agent/agentic_chat/controller/
 │   │
 │   └── service/                    # Tests for src/agentic_platform/service/
 │       ├── memory_gateway/
@@ -145,10 +142,10 @@ uv run pytest tests/unit/core/models/
 uv run pytest tests/unit/core/models/test_api_models.py
 
 # Specific test function
-uv run pytest tests/unit/core/models/test_api_models.py::test_agentic_request_from_text
+uv run pytest tests/unit/core/models/test_api_models.py::TestAgenticRequest::test_agent_request_from_text_convenience_method
 
 # Specific test class
-uv run pytest tests/unit/agent/diy_agent/test_diy_agent.py::TestDiyAgent
+uv run pytest tests/unit/core/models/test_api_models.py::TestAgenticRequest
 
 # By marker
 uv run pytest -m unit

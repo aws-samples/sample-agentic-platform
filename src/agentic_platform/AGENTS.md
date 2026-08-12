@@ -759,12 +759,9 @@ tests/
 │   │   └── converter/
 │   │       └── test_litellm_converters.py
 │   ├── agent/
-│   │   ├── diy_agent/
-│   │   │   ├── test_diy_agent.py
-│   │   │   └── test_diy_agent_controller.py
-│   │   └── pydanticai_agent/
-│   │       ├── test_pyai_agent.py
-│   │       └── test_pyai_agent_controller.py
+│   │   └── agentic_chat/
+│   │       ├── test_agentic_chat_agent.py
+│   │       └── test_agentic_chat_controller.py
 │   └── service/
 │       ├── memory_gateway/
 │       └── retrieval_gateway/
