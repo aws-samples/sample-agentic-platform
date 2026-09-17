@@ -46,10 +46,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-# Anchored to repo root — Python's dist `lib/` only. Without the leading
-# slash this also matches `cdk/lib/` (the CDK source tree).
-/lib/
-/lib64/
+lib/
+lib64/
 parts/
 sdist/
 var/
@@ -210,16 +208,3 @@ memory-bank/
 
 # Labs local docs (not for version control)
 labs/docs-ignore/
-# CDK
-**/node_modules/
-cdk/cdk.out/
-cdk/cdk.context.json
-# Colocated tsc build artifacts in the CDK source tree.
-cdk/bin/**/*.js
-cdk/bin/**/*.d.ts
-cdk/lib/**/*.js
-cdk/lib/**/*.d.ts
-cdk/lambda/**/*.js
-cdk/lambda/**/*.d.ts
-cdk/test/**/*.js
-cdk/test/**/*.d.ts
