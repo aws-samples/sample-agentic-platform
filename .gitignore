@@ -1,6 +1,9 @@
 # Venv file
 .venv
 
+# Claude 
+**/.claude/** 
+
 # Kiro steering docs
 .kiro
 
