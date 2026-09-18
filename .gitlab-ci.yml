@@ -1,0 +1,497 @@
+# ============================================================================
+# GitLab CI/CD Pipeline for Building and Pushing Container Images to AWS ECR
+# ============================================================================
+#
+# This pipeline automatically builds Docker containers and pushes them to AWS ECR.
+# It features intelligent change detection, parallel builds, and secure OIDC authentication.
+#
+# Features:
+# - Automatic service discovery from src/agentic_platform/agent/ directories
+# - Intelligent change detection (builds only what changed)
+# - Parallel builds for faster execution
+# - Secure AWS authentication via OIDC (no credentials stored)
+# - Automatic ECR repository creation
+#
+# Setup Required:
+# 1. Run: ./script/setup_aws_oidc.sh YOUR_GITLAB_PROJECT_PATH
+# 2. Add GitLab CI/CD variables: AWS_ROLE_ARN and AWS_REGION
+#
+# ============================================================================
+
+# Pipeline Trigger Configuration
+workflow:
+  rules:
+    # Automatic triggers
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^v.*/'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
+    
+    # Manual trigger with optional MANUAL_SERVICES parameter
+    # Options: "all" (build all), "changed" (default), or "service1,service2" (specific services)
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+      variables:
+        MANUAL_SERVICES: "${MANUAL_SERVICES:-changed}"
+    
+    # Do not run for any other pipeline sources
+    - when: never
+
+# ============================================================================
+# Pipeline Configuration
+# ============================================================================
+
+# Pipeline stages execute in this order
+stages:
+  - detect-changes  # Discover services and determine what to build
+  - build          # Build and push Docker images in parallel
+  - summary        # Display build results
+
+# Global variables (can be overridden in GitLab CI/CD settings)
+variables:
+  AWS_REGION: "us-east-1"
+
+# Default configuration for all jobs
+default:
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq git jq curl unzip
+    - |
+      # Install AWS CLI
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      unzip -q awscliv2.zip
+      ./aws/install
+      rm -rf aws awscliv2.zip
+
+# ============================================================================
+# Stage 1: Detect Changes
+# ============================================================================
+# This job discovers services, detects changes, and determines what to build
+
+detect-changes:
+  stage: detect-changes
+  script:
+    # Authenticate with AWS using OIDC
+    - echo "Authenticating with AWS using OIDC..."
+    - |
+      # Use GitLab's OIDC token to authenticate with AWS
+      CREDENTIALS=$(aws sts assume-role-with-web-identity \
+        --role-arn ${AWS_ROLE_ARN} \
+        --role-session-name "gitlab-ci-${CI_PROJECT_NAME}-${CI_PIPELINE_ID}" \
+        --web-identity-token ${CI_JOB_JWT_V2} \
+        --duration-seconds 3600 \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text)
+      
+      export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
+      export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
+      export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
+      
+      aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+      aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+      aws configure set aws_session_token $AWS_SESSION_TOKEN
+      aws configure set region ${AWS_REGION}
+      
+      echo "AWS authentication successful"
+    
+    # Discover services by scanning for Dockerfiles
+    - echo "Discovering services from src/agentic_platform/agent/ directory..."
+    - |
+      ALL_SERVICES=()
+      
+      # Scan for services with Dockerfiles
+      if [ -d "src/agentic_platform/agent" ]; then
+        for service_dir in src/agentic_platform/agent/*/; do
+          if [ -f "${service_dir}Dockerfile" ]; then
+            service_name=$(basename "$service_dir")
+            ALL_SERVICES+=("$service_name")
+          fi
+        done
+      fi
+      
+      # Fallback: check docker/ directory
+      if [ -d "docker" ]; then
+        for service_dir in docker/*/; do
+          if [ -f "${service_dir}Dockerfile" ]; then
+            service_name=$(basename "$service_dir")
+            ALL_SERVICES+=("$service_name")
+          fi
+        done
+      fi
+      
+      # Sort for consistent output
+      IFS=$'\n' ALL_SERVICES=($(sort <<<"${ALL_SERVICES[*]}"))
+      unset IFS
+      
+      echo "Discovered ${#ALL_SERVICES[@]} services:"
+      for service in "${ALL_SERVICES[@]}"; do
+        echo "  - $service"
+      done
+      
+      if [ ${#ALL_SERVICES[@]} -eq 0 ]; then
+        echo "No services found with Dockerfiles."
+      fi
+    
+    # Handle manual trigger parameters
+    - |
+      SERVICES_TO_BUILD=()
+      
+      if [ -n "${MANUAL_SERVICES:-}" ]; then
+        echo "Manual trigger detected with parameter: ${MANUAL_SERVICES}"
+        
+        if [ "${MANUAL_SERVICES}" = "all" ]; then
+          echo "Building all discovered services"
+          SERVICES_TO_BUILD=("${ALL_SERVICES[@]}")
+        elif [ "${MANUAL_SERVICES}" = "changed" ]; then
+          echo "Using change detection for manual trigger"
+        else
+          echo "Parsing comma-separated service list"
+          IFS=',' read -ra MANUAL_SERVICE_LIST <<< "${MANUAL_SERVICES}"
+          for service in "${MANUAL_SERVICE_LIST[@]}"; do
+            service=$(echo "$service" | xargs)
+            if [[ " ${ALL_SERVICES[@]} " =~ " ${service} " ]]; then
+              SERVICES_TO_BUILD+=("$service")
+            else
+              echo "Warning: Service '$service' not found, skipping"
+            fi
+          done
+        fi
+      fi
+    
+    # Detect changes to determine what to build
+    - |
+      if [ ${#SERVICES_TO_BUILD[@]} -eq 0 ]; then
+        echo "Running change detection..."
+        
+        # Determine what changed based on trigger type
+        if [ -n "${CI_MERGE_REQUEST_IID:-}" ]; then
+          echo "Trigger type: Merge Request"
+          BASE_SHA="${CI_MERGE_REQUEST_TARGET_BRANCH_SHA}"
+          HEAD_SHA="${CI_COMMIT_SHA}"
+        elif [ "${CI_COMMIT_BEFORE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+          echo "Trigger type: New branch (building all services)"
+          BASE_SHA=""
+          HEAD_SHA="${CI_COMMIT_SHA}"
+        else
+          echo "Trigger type: Push"
+          BASE_SHA="${CI_COMMIT_BEFORE_SHA}"
+          HEAD_SHA="${CI_COMMIT_SHA}"
+        fi
+        
+        echo "Comparing commits: ${BASE_SHA:-<none>} -> ${HEAD_SHA}"
+        
+        # Get list of changed files
+        if [ -n "${BASE_SHA}" ]; then
+          CHANGED_FILES=$(git diff --name-only ${BASE_SHA} ${HEAD_SHA} || echo "")
+        else
+          CHANGED_FILES=$(git ls-files || echo "")
+        fi
+        
+        echo "Changed files:"
+        echo "$CHANGED_FILES"
+        
+        # Check if core dependencies changed (rebuild all services if true)
+        CORE_CHANGED=false
+        CORE_PATTERNS=(
+          "pyproject.toml"
+          "requirements.txt"
+          "src/agentic_platform/core/"
+          "package.json"
+          "yarn.lock"
+        )
+        
+        for pattern in "${CORE_PATTERNS[@]}"; do
+          if echo "$CHANGED_FILES" | grep -q "$pattern"; then
+            echo "Core dependency change detected: $pattern"
+            CORE_CHANGED=true
+            break
+          fi
+        done
+        
+        if [ "$CORE_CHANGED" = true ]; then
+          echo "Core dependencies changed - marking all services for rebuild"
+          SERVICES_TO_BUILD=("${ALL_SERVICES[@]}")
+        else
+          # Check for service-specific changes
+          for service in "${ALL_SERVICES[@]}"; do
+            service_underscore=$(echo "$service" | tr '-' '_')
+            service_hyphen=$(echo "$service" | tr '_' '-')
+            
+            if echo "$CHANGED_FILES" | grep -q "docker/${service}/\|docker/${service_underscore}/\|docker/${service_hyphen}/"; then
+              echo "Changes detected in docker/${service}/"
+              SERVICES_TO_BUILD+=("$service")
+            elif echo "$CHANGED_FILES" | grep -q "src/agentic_platform/service/${service}/\|src/agentic_platform/service/${service_underscore}/\|src/agentic_platform/service/${service_hyphen}/"; then
+              echo "Changes detected in src/agentic_platform/service/${service}/"
+              SERVICES_TO_BUILD+=("$service")
+            elif echo "$CHANGED_FILES" | grep -q "src/agentic_platform/agent/${service}/\|src/agentic_platform/agent/${service_underscore}/\|src/agentic_platform/agent/${service_hyphen}/"; then
+              echo "Changes detected in src/agentic_platform/agent/${service}/"
+              SERVICES_TO_BUILD+=("$service")
+            fi
+          done
+        fi
+      fi
+    
+    # Check for missing ECR repositories
+    - |
+      echo "Validating ECR repositories..."
+      MISSING_REPO_SERVICES=()
+      
+      for service in "${ALL_SERVICES[@]}"; do
+        repo_name="agentic-platform-${service}"
+        
+        if aws ecr describe-repositories --repository-names "$repo_name" --region ${AWS_REGION} >/dev/null 2>&1; then
+          echo "ECR repository exists: $repo_name"
+        else
+          echo "ECR repository missing: $repo_name"
+          MISSING_REPO_SERVICES+=("$service")
+        fi
+      done
+      
+      if [ ${#MISSING_REPO_SERVICES[@]} -gt 0 ]; then
+        echo "Services with missing ECR repositories:"
+        for service in "${MISSING_REPO_SERVICES[@]}"; do
+          echo "  - $service"
+        done
+      fi
+    
+    # Generate final build list
+    - |
+      echo "Generating final build list..."
+      
+      # Combine changed services and services with missing repos
+      COMBINED_SERVICES=("${SERVICES_TO_BUILD[@]}" "${MISSING_REPO_SERVICES[@]}")
+      FINAL_SERVICES=($(printf '%s\n' "${COMBINED_SERVICES[@]}" | sort -u))
+      
+      echo "Final build list (${#FINAL_SERVICES[@]} services):"
+      for service in "${FINAL_SERVICES[@]}"; do
+        reasons=()
+        if [[ " ${SERVICES_TO_BUILD[@]} " =~ " ${service} " ]]; then
+          reasons+=("code changes")
+        fi
+        if [[ " ${MISSING_REPO_SERVICES[@]} " =~ " ${service} " ]]; then
+          reasons+=("missing ECR repository")
+        fi
+        echo "  - $service (${reasons[*]})"
+      done
+      
+      # Create JSON array for next stage
+      if [ ${#FINAL_SERVICES[@]} -gt 0 ]; then
+        SERVICES_JSON=$(printf '%s\n' "${FINAL_SERVICES[@]}" | jq -R . | jq -s -c .)
+      else
+        SERVICES_JSON="[]"
+      fi
+      
+      echo "SERVICES_TO_BUILD=$SERVICES_JSON" > build.env
+      echo "BUILD_COUNT=${#FINAL_SERVICES[@]}" >> build.env
+      
+      echo "Build configuration saved to build.env"
+      cat build.env
+  
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - build.env
+    expire_in: 1 hour
+  
+  id_tokens:
+    CI_JOB_JWT_V2:
+      aud: https://gitlab.com
+
+# ============================================================================
+# Stage 2: Build
+# ============================================================================
+# This job builds Docker images in parallel and pushes them to AWS ECR
+
+build:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  before_script:
+    - apk add --no-cache python3 py3-pip bash jq curl aws-cli
+  needs:
+    - job: detect-changes
+      artifacts: true
+  id_tokens:
+    CI_JOB_JWT_V2:
+      aud: https://gitlab.com
+  rules:
+    - if: '$BUILD_COUNT == "0"'
+      when: never
+    - when: on_success
+  script:
+    # Build all services in parallel
+    - |
+      cat > /tmp/build.sh << 'EOFSCRIPT'
+      #!/bin/bash
+      set -e
+      
+      echo "Authenticating with AWS using OIDC..."
+      
+      CREDENTIALS=$(aws sts assume-role-with-web-identity \
+        --role-arn ${AWS_ROLE_ARN} \
+        --role-session-name "gitlab-ci-${CI_PROJECT_NAME}-${CI_PIPELINE_ID}" \
+        --web-identity-token ${CI_JOB_JWT_V2} \
+        --duration-seconds 3600 \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text)
+      
+      export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | awk '{print $1}')
+      export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | awk '{print $2}')
+      export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | awk '{print $3}')
+      
+      aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+      aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+      aws configure set aws_session_token $AWS_SESSION_TOKEN
+      aws configure set region ${AWS_REGION}
+      
+      echo "AWS authentication successful"
+      
+      echo "Parsing services to build..."
+      echo "SERVICES_TO_BUILD: $SERVICES_TO_BUILD"
+      
+      if [ "$SERVICES_TO_BUILD" = "[]" ] || [ -z "$SERVICES_TO_BUILD" ]; then
+        echo "No services to build. Exiting successfully."
+        exit 0
+      fi
+      
+      SERVICES=($(echo "$SERVICES_TO_BUILD" | jq -r '.[]'))
+      echo "Services to build in parallel: ${SERVICES[@]}"
+      
+      declare -a BUILD_PIDS
+      declare -a BUILD_SERVICES
+      
+      # Function to build a single service
+      build_service() {
+        local service=$1
+        echo "========================================="
+        echo "Building service: $service"
+        echo "========================================="
+        
+        chmod +x deploy/build-container-gitlab.sh
+        ./deploy/build-container-gitlab.sh "$service"
+        
+        local exit_code=$?
+        if [ $exit_code -eq 0 ]; then
+          echo "✓ Build completed successfully for: $service"
+        else
+          echo "✗ Build failed for: $service (exit code: $exit_code)"
+        fi
+        return $exit_code
+      }
+      
+      # Launch parallel builds
+      for service in "${SERVICES[@]}"; do
+        echo "Launching parallel build for: $service"
+        (build_service "$service"; exit $?) &
+        BUILD_PIDS+=($!)
+        BUILD_SERVICES+=("$service")
+      done
+      
+      # Wait for all builds and collect results
+      echo ""
+      echo "Waiting for all parallel builds to complete..."
+      FAILED_BUILDS=()
+      SUCCESS_BUILDS=()
+      
+      for i in "${!BUILD_PIDS[@]}"; do
+        pid=${BUILD_PIDS[$i]}
+        service=${BUILD_SERVICES[$i]}
+        
+        if wait $pid; then
+          echo "✓ Build succeeded: $service"
+          SUCCESS_BUILDS+=("$service")
+        else
+          echo "✗ Build failed: $service"
+          FAILED_BUILDS+=("$service")
+        fi
+      done
+      
+      # Report results
+      echo ""
+      echo "========================================="
+      echo "Build Results Summary"
+      echo "========================================="
+      echo "Total services: ${#SERVICES[@]}"
+      echo "Successful: ${#SUCCESS_BUILDS[@]}"
+      echo "Failed: ${#FAILED_BUILDS[@]}"
+      
+      if [ ${#FAILED_BUILDS[@]} -gt 0 ]; then
+        echo ""
+        echo "Failed services:"
+        for service in "${FAILED_BUILDS[@]}"; do
+          echo "  - $service"
+        done
+        exit 1
+      else
+        echo ""
+        echo "All builds completed successfully!"
+        exit 0
+      fi
+      EOFSCRIPT
+    - chmod +x /tmp/build.sh
+    - /bin/bash /tmp/build.sh
+
+# ============================================================================
+# Stage 3: Summary
+# ============================================================================
+# This job displays the final build results
+
+summary:
+  stage: summary
+  needs:
+    - job: detect-changes
+      artifacts: true
+    - job: build
+      optional: true
+  when: always
+  script:
+    - |
+      #!/bin/bash
+      set -e
+      
+      echo "========================================="
+      echo "Pipeline Build Summary"
+      echo "========================================="
+      echo ""
+      
+      if [ -f "build.env" ]; then
+        source build.env
+        
+        if [ "$BUILD_COUNT" = "0" ] || [ "$SERVICES_TO_BUILD" = "[]" ]; then
+          echo "📋 Result: No services were built"
+          echo ""
+          echo "Reason: No code changes detected and all ECR repositories exist."
+          echo ""
+          echo "The pipeline completed successfully with no build actions required."
+        else
+          echo "📦 Services Built: $BUILD_COUNT"
+          echo ""
+          echo "The following services were processed:"
+          printf '%s\n' "$SERVICES_TO_BUILD" | jq -r '.[]' | while read -r service; do
+            echo "  ✓ $service"
+          done
+          echo ""
+          echo "All container images have been built and pushed to AWS ECR."
+        fi
+      else
+        echo "⚠️  Warning: build.env artifact not found"
+        echo ""
+        echo "Unable to generate detailed summary."
+      fi
+      
+      echo ""
+      echo "========================================="
+      echo "Pipeline execution completed"
+      echo "========================================="

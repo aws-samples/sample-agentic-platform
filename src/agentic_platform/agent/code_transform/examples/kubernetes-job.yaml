@@ -1,0 +1,143 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: atx-container-test-runner
+  namespace: default
+  labels:
+    app: atx-runner
+    version: v1
+spec:
+  # Number of times to retry on failure
+  backoffLimit: 2
+  
+  # Clean up completed jobs after 1 hour
+  ttlSecondsAfterFinished: 3600
+  
+  template:
+    metadata:
+      labels:
+        app: atx-runner
+    spec:
+      restartPolicy: Never
+      
+      # Service account with S3 access (using IRSA - IAM Roles for Service Accounts)
+      serviceAccountName: atx-runner-sa
+      
+      containers:
+      - name: atx-runner
+        image: <account>.dkr.ecr.<region>.amazonaws.com/atx-test-runner:latest
+        imagePullPolicy: Always
+        
+        # Command to run
+        command:
+          - "/usr/local/bin/atx-orchestrator.sh"
+        args:
+          - "--csv-file"
+          - "s3://my-source-bucket/repos.csv"
+          - "--mode"
+          - "parallel"
+          - "--max-jobs"
+          - "5"
+        
+        # Resource limits
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        
+        # Environment variables
+        env:
+          - name: AWS_REGION
+            value: "us-east-1"
+          - name: SOURCE_BUCKET
+            value: "my-source-bucket"
+          - name: RESULTS_BUCKET
+            value: "my-results-bucket"
+        
+        # Volume mounts (optional - for local CSV files)
+        volumeMounts:
+          - name: config
+            mountPath: /config
+            readOnly: true
+      
+      # Volumes (optional)
+      volumes:
+        - name: config
+          configMap:
+            name: atx-runner-config
+
+---
+# ConfigMap for CSV configuration (optional - if not using S3)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atx-runner-config
+  namespace: default
+data:
+  repos.csv: |
+    s3_path,build_command,transformation_name,output_s3_path
+    s3://source-bucket/customer1/folder1/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer1/folder1/
+    s3://source-bucket/customer1/folder2/,noop,Comprehensive-Codebase-Analysis,s3://results-bucket/customer1/folder2/
+
+---
+# Service Account with IAM role annotation (IRSA)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: atx-runner-sa
+  namespace: default
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<account>:role/atx-runner-task-role
+
+---
+# CronJob example for scheduled execution
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: atx-runner-scheduled
+  namespace: default
+spec:
+  # Run every day at 2 AM
+  schedule: "0 2 * * *"
+  
+  # Keep last 3 successful and 1 failed job
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app: atx-runner
+        spec:
+          restartPolicy: Never
+          serviceAccountName: atx-runner-sa
+          containers:
+          - name: atx-runner
+            image: <account>.dkr.ecr.<region>.amazonaws.com/atx-test-runner:latest
+            imagePullPolicy: Always
+            command:
+              - "/usr/local/bin/atx-orchestrator.sh"
+            args:
+              - "--csv-file"
+              - "s3://my-source-bucket/repos.csv"
+              - "--mode"
+              - "parallel"
+              - "--max-jobs"
+              - "5"
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "1000m"
+              limits:
+                memory: "4Gi"
+                cpu: "2000m"
+            env:
+              - name: AWS_REGION
+                value: "us-east-1"

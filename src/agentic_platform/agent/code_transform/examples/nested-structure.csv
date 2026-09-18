@@ -1,0 +1,10 @@
+# Example: Deeply Nested Folder Structure
+# Use case: Processing code organized in a hierarchical structure
+# This shows how to handle nested folder paths in S3
+
+s3_path,build_command,transformation_name,output_s3_path
+s3://code-archive/2024/q1/customer1/project-a/,noop,Comprehensive-Codebase-Analysis,s3://analysis-results/2024/q1/customer1/project-a/
+s3://code-archive/2024/q1/customer1/project-b/,noop,Comprehensive-Codebase-Analysis,s3://analysis-results/2024/q1/customer1/project-b/
+s3://code-archive/2024/q2/customer1/project-a/,noop,Comprehensive-Codebase-Analysis,s3://analysis-results/2024/q2/customer1/project-a/
+s3://code-archive/2024/q2/customer2/migration/phase1/,noop,Comprehensive-Codebase-Analysis,s3://analysis-results/2024/q2/customer2/migration/phase1/
+s3://code-archive/2024/q2/customer2/migration/phase2/,noop,Comprehensive-Codebase-Analysis,s3://analysis-results/2024/q2/customer2/migration/phase2/
