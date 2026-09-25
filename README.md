@@ -131,6 +131,9 @@ git clone https://github.com/aws-samples/sample-agentic-platform.git
 cd sample-agentic-platform
 uv sync
 
+# Create the local environment file used by docker compose
+cp .env.example .env
+
 # Start supporting services (Postgres, Redis, LiteLLM, Memory Gateway)
 make dev:deps
 

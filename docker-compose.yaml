@@ -65,9 +65,9 @@ services:
   memory-gateway:
     build:
       context: .
-      dockerfile: docker/memory-gateway/Dockerfile
+      dockerfile: src/agentic_platform/service/memory_gateway/Dockerfile
     ports:
-      - "4001:8000"
+      - "4001:8080"
     env_file:
       - .env
     environment:
