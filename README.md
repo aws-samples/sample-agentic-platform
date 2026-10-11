@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/aws-samples-sample-agentic-platform-badge.png)](https://mseep.ai/app/aws-samples-sample-agentic-platform)
+
 # Agentic Platform
 
 A sample of what an agentic platform might look like on AWS. The repo demonstrates multiple compute layer options, a shared core library, gateway services, and a collection of agents built with different frameworks — all wired together as a working reference architecture.
