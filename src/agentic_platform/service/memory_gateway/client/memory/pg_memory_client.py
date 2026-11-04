@@ -140,10 +140,17 @@ class PGMemoryClient:
                     'messages': data.get('messages'),
                     'session_metadata': data.get('session_metadata'),
                     'updated_at': func.now()
-                }
+                },
+                # Only the owner of an existing session may update it. Without this,
+                # anyone who knows a session_id could overwrite (and take over) it.
+                where=SESSION_CONTEXT_TABLE.c.user_id == data.get('user_id')
             )
-            
-            conn.execute(stmt)
+
+            result = conn.execute(stmt)
+            if result.rowcount == 0:
+                # Conflict on session_id with a row owned by a different user.
+                conn.rollback()
+                raise PermissionError("Session context belongs to a different user")
             conn.commit()
             logger.info(f"Executed stmt: {stmt}")
         
