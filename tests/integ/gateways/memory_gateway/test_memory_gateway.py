@@ -29,6 +29,21 @@ from agentic_platform.core.models.memory_models import (
     Memory,
     Message
 )
+from agentic_platform.core.context.request_context import auth_context_var
+from agentic_platform.core.models.auth_models import AgenticPlatformAuth, UserAuth
+
+# Must match the user_id in the sample_create_memory_request fixture. Controllers
+# scope every request to the authenticated caller, so tests run as that user.
+CALLER_USER_ID = "550e8400-e29b-41d4-a716-446655440001"
+
+
+@pytest.fixture(autouse=True)
+def caller_auth_context():
+    """Authenticate every test in this module as CALLER_USER_ID."""
+    token = auth_context_var.set(AgenticPlatformAuth.from_user(UserAuth(user_id=CALLER_USER_ID)))
+    yield
+    auth_context_var.reset(token)
+
 
 class TestMemoryGateway:
     """Integration tests for Memory Gateway controller with mocked external dependencies"""
@@ -130,7 +145,8 @@ class TestMemoryGateway:
                     assert memory.session_id == session_id, f"Memory session_id should be {session_id}"
                 
                 # Verify that the memory client was called with the correct request
-                mock_get_memories.assert_called_once_with(request)
+                # Controller scopes the lookup to the authenticated caller
+                mock_get_memories.assert_called_once_with(request.model_copy(update={"user_id": CALLER_USER_ID}))
                 
                 print(f"✅ Memory Gateway get_memories by session_id test passed!")
                 print(f"   Retrieved {len(response.memories)} memories for session {session_id}")
@@ -243,7 +259,8 @@ class TestMemoryGateway:
                     assert len(session_context.messages) > 0, "Messages should not be empty"
                 
                 # Verify that the memory client was called with the correct request
-                mock_get_session.assert_called_once_with(request)
+                # Controller scopes the lookup to the authenticated caller
+                mock_get_session.assert_called_once_with(request.model_copy(update={"user_id": CALLER_USER_ID}))
                 
                 print(f"✅ Memory Gateway get_session test passed!")
                 print(f"   Retrieved {len(response.results)} session contexts")
@@ -258,7 +275,7 @@ class TestMemoryGateway:
         
         # Create a new session context
         session_id = str(uuid.uuid4())
-        user_id = str(uuid.uuid4())
+        user_id = CALLER_USER_ID
         agent_id = str(uuid.uuid4())
         
         session_context = SessionContext(
