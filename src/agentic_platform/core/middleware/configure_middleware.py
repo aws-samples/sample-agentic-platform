@@ -23,8 +23,10 @@ def configuration_server_middleware(app: FastAPI, path_prefix: str, excluded_pat
     app.add_middleware(RequestContextMiddleware)
     # Auth results are stored in the request state.
     
-    # Don't authenticate requests normally if running locally or inside of agentcore (which handles auth separately).
-    if ENVIRONMENT not in ['local', 'agentcore']:
+    # Don't authenticate inside of agentcore (which handles auth separately).
+    # In local, AuthMiddleware skips token verification and injects a mock user so
+    # handlers that scope by the caller's identity still have an auth context.
+    if ENVIRONMENT != 'agentcore':
         app.add_middleware(AuthMiddleware, excluded_paths=excluded_paths)
 
     # Converts things like /llm-gateway/model/llama3-70b/converse to /model/llama3-70b/converse

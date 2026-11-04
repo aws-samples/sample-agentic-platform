@@ -1,62 +1,88 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+from fastapi import HTTPException
 
 from agentic_platform.core.models.memory_models import (
     GetMemoriesRequest, GetMemoriesResponse, Memory
 )
 from agentic_platform.service.memory_gateway.api.get_memory_controller import GetMemoriesController
 
+PATCH_TARGET = 'agentic_platform.service.memory_gateway.api.get_memory_controller.MemoryClient.get_memories'
+
 
 class TestGetMemoriesController:
-    """Test GetMemoriesController - a simple delegation controller"""
-    
-    @patch('agentic_platform.service.memory_gateway.api.get_memory_controller.MemoryClient.get_memories')
-    def test_get_memories_delegates_to_memory_client(self, mock_get_memories):
-        """Test that controller properly delegates to MemoryClient.get_memories"""
-        # Setup mock response
+    """Test GetMemoriesController - scopes to the caller and delegates to MemoryClient"""
+
+    @patch(PATCH_TARGET)
+    def test_get_memories_delegates_to_memory_client(self, mock_get_memories, caller_auth):
+        """Controller delegates with the caller's user_id and keeps other fields"""
         mock_memory = Memory(
             session_id="test-session",
-            user_id="test-user", 
+            user_id=caller_auth,
             agent_id="test-agent",
             content="Test memory content",
             embedding_model="test-model"
         )
         mock_response = GetMemoriesResponse(memories=[mock_memory])
         mock_get_memories.return_value = mock_response
-        
-        # Create request
-        request = GetMemoriesRequest(
-            user_id="test-user",
-            session_id="test-session",
-            limit=5
-        )
-        
-        # Call controller
+
+        request = GetMemoriesRequest(user_id=caller_auth, session_id="test-session", agent_id="test-agent", limit=5)
         result = GetMemoriesController.get_memories(request)
-        
-        # Verify delegation
-        mock_get_memories.assert_called_once_with(request)
+
+        mock_get_memories.assert_called_once()
+        passed = mock_get_memories.call_args.args[0]
+        assert passed.user_id == caller_auth
+        assert passed.session_id == "test-session"
+        assert passed.agent_id == "test-agent"
+        assert passed.limit == 5
         assert result is mock_response
-        assert isinstance(result, GetMemoriesResponse)
-        assert len(result.memories) == 1
-        assert result.memories[0].content == "Test memory content"
-    
-    @patch('agentic_platform.service.memory_gateway.api.get_memory_controller.MemoryClient.get_memories')
-    def test_get_memories_passes_through_exceptions(self, mock_get_memories):
-        """Test that controller passes through exceptions from MemoryClient"""
-        # Setup mock to raise exception
+
+    @patch(PATCH_TARGET)
+    def test_body_user_id_is_replaced_with_caller(self, mock_get_memories, caller_auth, other_user_id):
+        """A user_id in the body is ignored in favour of the authenticated caller"""
+        mock_get_memories.return_value = GetMemoriesResponse(memories=[])
+
+        request = GetMemoriesRequest(user_id=other_user_id)
+        GetMemoriesController.get_memories(request)
+
+        assert mock_get_memories.call_args.args[0].user_id == caller_auth
+        assert request.user_id == other_user_id
+
+    @patch(PATCH_TARGET)
+    def test_missing_user_id_is_filled_from_caller(self, mock_get_memories, caller_auth):
+        """Querying by session_id only still scopes to the caller"""
+        mock_get_memories.return_value = GetMemoriesResponse(memories=[])
+
+        GetMemoriesController.get_memories(GetMemoriesRequest(session_id="victim-session"))
+
+        assert mock_get_memories.call_args.args[0].user_id == caller_auth
+
+    @patch(PATCH_TARGET)
+    def test_unauthenticated_is_forbidden(self, mock_get_memories):
+        """No auth context -> 403 and no database call"""
+        with pytest.raises(HTTPException) as exc:
+            GetMemoriesController.get_memories(GetMemoriesRequest(user_id="x"))
+        assert exc.value.status_code == 403
+        mock_get_memories.assert_not_called()
+
+    @patch(PATCH_TARGET)
+    def test_service_auth_is_forbidden(self, mock_get_memories, service_auth):
+        """Service (M2M) callers have no user identity -> 403"""
+        with pytest.raises(HTTPException) as exc:
+            GetMemoriesController.get_memories(GetMemoriesRequest(user_id="x"))
+        assert exc.value.status_code == 403
+        mock_get_memories.assert_not_called()
+
+    @patch(PATCH_TARGET)
+    def test_get_memories_passes_through_exceptions(self, mock_get_memories, caller_auth):
+        """Controller passes through exceptions from MemoryClient"""
         mock_get_memories.side_effect = ValueError("Database connection failed")
-        
-        # Create request
-        request = GetMemoriesRequest(user_id="test-user")
-        
-        # Should raise the same exception
+
         with pytest.raises(ValueError, match="Database connection failed"):
-            GetMemoriesController.get_memories(request)
-        
-        # Verify the call was made
-        mock_get_memories.assert_called_once_with(request)
-    
+            GetMemoriesController.get_memories(GetMemoriesRequest(user_id=caller_auth))
+
+        mock_get_memories.assert_called_once()
+
     def test_controller_is_static_method(self):
         """Test that get_memories is a static method"""
         # Should be able to call without instantiating

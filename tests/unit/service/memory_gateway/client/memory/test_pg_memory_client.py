@@ -127,22 +127,58 @@ class TestPGMemoryClient:
         """Test upserting a new session context"""
         # Setup mock database connection
         mock_conn = MagicMock()
+        mock_conn.execute.return_value.rowcount = 1
         mock_write_db.connect.return_value.__enter__.return_value = mock_conn
-        
+
         # Create request
         request = UpsertSessionContextRequest(session_context=self.sample_session_context)
-        
+
         # Call method
         result = PGMemoryClient.upsert_session_context(request)
-        
+
         # Verify results
         assert isinstance(result, UpsertSessionContextResponse)
         assert result.session_context.session_id == self.sample_session_id
-        
+
         # Verify database operations
         mock_write_db.connect.assert_called_once()
         mock_conn.execute.assert_called_once()
         mock_conn.commit.assert_called_once()
+
+    @patch('agentic_platform.service.memory_gateway.client.memory.pg_memory_client.write_db')
+    def test_upsert_session_context_update_is_restricted_to_owner(self, mock_write_db, mock_memory_table):
+        """The ON CONFLICT update only applies to rows owned by the same user_id"""
+        from sqlalchemy.dialects import postgresql
+
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.rowcount = 1
+        mock_write_db.connect.return_value.__enter__.return_value = mock_conn
+
+        PGMemoryClient.upsert_session_context(
+            UpsertSessionContextRequest(session_context=self.sample_session_context)
+        )
+
+        stmt = mock_conn.execute.call_args.args[0]
+        compiled = stmt.compile(dialect=postgresql.dialect())
+        sql = str(compiled)
+        assert "ON CONFLICT (session_id) DO UPDATE" in sql
+        assert "WHERE session_context.user_id = " in sql
+        assert self.sample_user_id in compiled.params.values()
+
+    @patch('agentic_platform.service.memory_gateway.client.memory.pg_memory_client.write_db')
+    def test_upsert_session_context_owned_by_another_user_raises(self, mock_write_db, mock_memory_table):
+        """No row affected (conflict with another user's session) -> PermissionError, no commit"""
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.rowcount = 0
+        mock_write_db.connect.return_value.__enter__.return_value = mock_conn
+
+        with pytest.raises(PermissionError):
+            PGMemoryClient.upsert_session_context(
+                UpsertSessionContextRequest(session_context=self.sample_session_context)
+            )
+
+        mock_conn.rollback.assert_called_once()
+        mock_conn.commit.assert_not_called()
 
     @patch('agentic_platform.service.memory_gateway.client.memory.pg_memory_client.select')
     @patch('agentic_platform.service.memory_gateway.client.memory.pg_memory_client.desc')

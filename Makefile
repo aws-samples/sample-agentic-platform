@@ -53,6 +53,11 @@ test:
 test-unit:
 	uv run pytest tests/unit/
 
+# Real-Postgres integration tests. Needs a migrated local Postgres (make dev:deps && uv run alembic upgrade head).
+# --confcutdir skips tests/conftest.py, which mocks the database drivers.
+test-integ-db:
+	uv run pytest tests/integ/gateways/memory_gateway/test_memory_gateway_pg_scoping.py --confcutdir=tests/integ
+
 test-cov:
 	uv run pytest --cov=src/agentic_platform --cov-report=term-missing
 
